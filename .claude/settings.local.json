@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile:*)",
+      "Bash(npm run lint:*)",
+      "Bash(python:*)",
+      "Bash(venvScriptspython.exe -m py_compile inventory/models.py inventory/views.py)",
+      "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/models.py inventory/views.py)",
+      "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/views.py)"
+    ]
+  }
+}
