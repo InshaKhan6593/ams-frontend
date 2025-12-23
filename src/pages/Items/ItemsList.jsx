@@ -25,11 +25,13 @@ const ItemsList = () => {
     try {
       setLoading(true);
       const data = await itemsAPI.getAll();
-      setItems(Array.isArray(data) ? data : data.results || []);
-      
-      // Extract unique categories
+      // Handle both array and paginated response formats
+      const itemsList = Array.isArray(data) ? data : (data.results || []);
+      setItems(itemsList);
+
+      // Extract unique categories from the normalized items list
       const uniqueCategories = [...new Map(
-        data.map(item => [item.category, {
+        itemsList.map(item => [item.category, {
           id: item.category,
           name: item.category_name
         }])

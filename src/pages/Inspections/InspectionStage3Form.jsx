@@ -1032,7 +1032,9 @@ const CreateItemModal = ({ inspectionItem, onClose, onCreate, loading }) => {
   const fetchLocations = async () => {
     try {
       const data = await locationsAPI.getLocations();
-      setLocations(data.filter(loc => loc.is_standalone && loc.is_active));
+      // Handle both array and paginated response formats
+      const locationsList = Array.isArray(data) ? data : (data.results || []);
+      setLocations(locationsList.filter(loc => loc.is_standalone && loc.is_active));
     } catch (err) {
       console.error('Error fetching locations:', err);
     }

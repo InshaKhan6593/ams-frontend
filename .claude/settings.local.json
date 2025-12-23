@@ -9,7 +9,9 @@
       "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/views.py)",
       "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/models.py)",
       "Bash(\"./venv/Scripts/python.exe\" manage.py makemigrations inventory --name add_unique_location_name)",
-      "Bash(\"./venv/Scripts/python.exe\" -m py_compile \"C:\\\\Users\\\\Insha Khan\\\\ams_v3_user\\\\inventory\\\\views.py\")"
+      "Bash(\"./venv/Scripts/python.exe\" -m py_compile \"C:\\\\Users\\\\Insha Khan\\\\ams_v3_user\\\\inventory\\\\views.py\")",
+      "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/serializers.py)",
+      "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/models.py inventory/serializers.py)"
     ]
   }
 }

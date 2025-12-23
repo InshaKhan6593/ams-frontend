@@ -124,10 +124,8 @@ const LocationForm = () => {
       return false;
     }
 
-    if (!formData.code.trim()) {
-      setError('Code is required');
-      return false;
-    }
+    // Code is optional - will be auto-generated if not provided
+    // Just validate if it's not empty
 
     if (!formData.location_type) {
       setError('Location type is required');
@@ -157,7 +155,7 @@ const LocationForm = () => {
 
       const submitData = {
         name: formData.name,
-        code: formData.code,
+        code: formData.code.trim() || '',  // Empty string if not provided - backend will auto-generate
         location_type: formData.location_type,
         parent_location: formData.parent_location || null,
         is_standalone: formData.is_standalone,
@@ -180,11 +178,46 @@ const LocationForm = () => {
       setTimeout(() => navigate('/dashboard/locations'), 1500);
     } catch (err) {
       console.error('Error saving location:', err);
-      const errorMessage = err.response?.data?.error ||
-                          err.response?.data?.code?.[0] ||
-                          err.response?.data?.name?.[0] ||
-                          err.response?.data?.detail ||
-                          'Failed to save location';
+
+      // Extract error message from various possible response formats
+      let errorMessage = 'Failed to save location';
+
+      if (err.response?.data) {
+        const data = err.response.data;
+
+        // Handle field-specific validation errors
+        if (data.parent_location) {
+          errorMessage = Array.isArray(data.parent_location)
+            ? data.parent_location[0]
+            : data.parent_location;
+        } else if (data.code) {
+          errorMessage = Array.isArray(data.code) ? data.code[0] : data.code;
+        } else if (data.name) {
+          errorMessage = Array.isArray(data.name) ? data.name[0] : data.name;
+        } else if (data.location_type) {
+          errorMessage = Array.isArray(data.location_type) ? data.location_type[0] : data.location_type;
+        } else if (data.is_standalone) {
+          errorMessage = Array.isArray(data.is_standalone) ? data.is_standalone[0] : data.is_standalone;
+        } else if (data.is_store) {
+          errorMessage = Array.isArray(data.is_store) ? data.is_store[0] : data.is_store;
+        } else if (data.error) {
+          errorMessage = data.error;
+        } else if (data.detail) {
+          errorMessage = data.detail;
+        } else if (data.non_field_errors) {
+          errorMessage = Array.isArray(data.non_field_errors)
+            ? data.non_field_errors[0]
+            : data.non_field_errors;
+        } else {
+          // If there are any field errors, show the first one
+          const firstErrorField = Object.keys(data)[0];
+          if (firstErrorField && data[firstErrorField]) {
+            const fieldError = data[firstErrorField];
+            errorMessage = Array.isArray(fieldError) ? fieldError[0] : fieldError;
+          }
+        }
+      }
+
       setError(errorMessage);
     } finally {
       setSaving(false);
@@ -260,7 +293,7 @@ const LocationForm = () => {
             {/* Code */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                Location Code <span className="text-red-500">*</span>
+                Location Code <span className="text-gray-400">(Optional)</span>
               </label>
               <input
                 type="text"
@@ -268,9 +301,11 @@ const LocationForm = () => {
                 value={formData.code}
                 onChange={handleChange}
                 className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
-                placeholder="MB-001"
-                required
+                placeholder="AUTO-GENERATED"
               />
+              <p className="text-xs text-gray-500 mt-0.5">
+                Auto-generated if not provided (e.g., DEPT-0001, STR-0002)
+              </p>
             </div>
 
             {/* Location Type */}
@@ -304,19 +339,28 @@ const LocationForm = () => {
                   <LoadingSpinner size="small" />
                 </div>
               ) : (
-                <select
-                  name="parent_location"
-                  value={formData.parent_location}
-                  onChange={handleChange}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="">No parent (Root location)</option>
-                  {availableParents.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name} ({location.code})
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    name="parent_location"
+                    value={formData.parent_location}
+                    onChange={handleChange}
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">No parent (Root location)</option>
+                    {availableParents.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name} ({location.code})
+                      </option>
+                    ))}
+                  </select>
+                  {!formData.parent_location && !isEditMode && (
+                    <div className="mt-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-1">
+                      <p className="text-xs text-amber-700">
+                        ⚠️ Only one root location is allowed in the system
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
               <p className="text-xs text-gray-500 mt-0.5">Leave empty for root location</p>
             </div>
