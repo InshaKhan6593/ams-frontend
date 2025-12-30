@@ -5,8 +5,8 @@ const BASE_URL = '/inter-store-requests';
 
 export const interStoreRequestsAPI = {
   // Get all requests (filtered by user's accessible stores)
-  getAll: async () => {
-    const response = await apiClient.get(BASE_URL + '/');
+  getAll: async (params = {}) => {
+    const response = await apiClient.get(BASE_URL + '/', { params });
     return response.data;
   },
 
@@ -23,14 +23,14 @@ export const interStoreRequestsAPI = {
   },
 
   // Get outgoing requests (initiated by user's stores)
-  getOutgoing: async () => {
-    const response = await apiClient.get(`${BASE_URL}/outgoing/`);
+  getOutgoing: async (params = {}) => {
+    const response = await apiClient.get(`${BASE_URL}/outgoing/`, { params });
     return response.data;
   },
 
   // Get incoming requests (to be fulfilled by user's stores)
-  getIncoming: async () => {
-    const response = await apiClient.get(`${BASE_URL}/incoming/`);
+  getIncoming: async (params = {}) => {
+    const response = await apiClient.get(`${BASE_URL}/incoming/`, { params });
     return response.data;
   },
 

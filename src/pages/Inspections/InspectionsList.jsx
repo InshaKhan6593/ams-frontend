@@ -1,50 +1,48 @@
 // src/pages/Inspections/InspectionsList.jsx
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, FileText, Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { inspectionsAPI } from '../../api/inspections';
 import { useAuth } from '../../hooks/useAuth';
+import { useInspections } from '../../hooks/queries';
+import { useDebounce } from '../../utils/debounce';
+import { SkeletonList } from '../../components/common/Skeleton';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const InspectionsList = () => {
   const { user: currentUser } = useAuth();
-  const [inspections, setInspections] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [stageFilter, setStageFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  useEffect(() => {
-    fetchInspections();
-  }, []);
+  // Debounce search to reduce API calls
+  const debouncedSearch = useDebounce(searchTerm, 500);
 
-  const fetchInspections = async () => {
-    try {
-      setLoading(true);
-      const data = await inspectionsAPI.getAll();
-      setInspections(Array.isArray(data) ? data : data.results || []);
-      setError('');
-    } catch (err) {
-      setError('Failed to load inspection certificates');
-      console.error('Error fetching inspections:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Build query params
+  const queryParams = useMemo(() => {
+    const params = {};
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (stageFilter) params.stage = stageFilter;
+    if (statusFilter) params.status = statusFilter;
+    return params;
+  }, [debouncedSearch, stageFilter, statusFilter]);
 
-  // Filter inspections
-  const filteredInspections = inspections.filter((inspection) => {
-    const matchesSearch = 
-      inspection.certificate_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inspection.contractor_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (inspection.contract_no && inspection.contract_no.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Fetch inspections with React Query (automatic caching)
+  const { data: inspections = [], isLoading: loading, error, refetch } = useInspections(queryParams);
 
-    const matchesStage = !stageFilter || inspection.stage === stageFilter;
-    const matchesStatus = !statusFilter || inspection.status === statusFilter;
+  // Compute filtered inspections (for client-side filtering if needed)
+  const filteredInspections = useMemo(() => {
+    return inspections.filter((inspection) => {
+      const matchesSearch = !searchTerm ||
+        inspection.certificate_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inspection.contractor_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (inspection.contract_no && inspection.contract_no.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    return matchesSearch && matchesStage && matchesStatus;
-  });
+      const matchesStage = !stageFilter || inspection.stage === stageFilter;
+      const matchesStatus = !statusFilter || inspection.status === statusFilter;
+
+      return matchesSearch && matchesStage && matchesStatus;
+    });
+  }, [inspections, searchTerm, stageFilter, statusFilter]);
 
   const stageColors = {
     INITIATED: 'bg-yellow-100 text-yellow-700',
@@ -65,8 +63,14 @@ const InspectionsList = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="large" />
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-sm font-bold text-gray-900">Inspection Certificates</h1>
+            <p className="text-xs text-gray-600 mt-0.5">Loading inspection certificates...</p>
+          </div>
+        </div>
+        <SkeletonList count={8} />
       </div>
     );
   }
@@ -137,7 +141,7 @@ const InspectionsList = () => {
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-2 py-1.5 rounded-lg text-xs">
-          {error}
+          {error.response?.data?.detail || error.message || 'Failed to load inspection certificates'}
         </div>
       )}
 

@@ -43,7 +43,8 @@ export const categoriesAPI = {
   // Get all categories (supports hierarchical filtering)
   getAll: async (params = {}) => {
     const response = await apiClient.get('/categories/', { params });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data) ? response.data : (response.data.results || []);
   },
 
   // Get single category
@@ -73,17 +74,19 @@ export const categoriesAPI = {
   // Get broader categories (parent categories without parent_category)
   getBroaderCategories: async () => {
     const response = await apiClient.get('/categories/', {
-      params: { parent_category__isnull: true }
+      params: { parent_category__isnull: true, page_size: 1000 }
     });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data) ? response.data : (response.data.results || []);
   },
 
   // Get sub-categories for a specific broader category
   getSubCategories: async (parentCategoryId) => {
     const response = await apiClient.get('/categories/', {
-      params: { parent_category: parentCategoryId }
+      params: { parent_category: parentCategoryId, page_size: 1000 }
     });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data) ? response.data : (response.data.results || []);
   },
 
   // Get available tracking types

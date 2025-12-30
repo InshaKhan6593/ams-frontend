@@ -1,19 +1,22 @@
 // src/pages/Acknowledgments/AcknowledgmentForm.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { 
-  CheckCircle, XCircle, AlertCircle, Package, MapPin, 
-  Calendar, User, FileText, ArrowLeft, Save 
+import {
+  CheckCircle, XCircle, AlertCircle, Package, MapPin,
+  Calendar, User, FileText, ArrowLeft, Save
 } from 'lucide-react';
 import { stockEntriesAPI } from '../../api/stockEntries';
+import { useAcknowledgeStockEntry } from '../../hooks/queries';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const AcknowledgmentForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
 
+  // React Query mutation hook
+  const acknowledgeMutation = useAcknowledgeStockEntry();
+
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [returnEntryNumber, setReturnEntryNumber] = useState('');
@@ -123,10 +126,9 @@ const AcknowledgmentForm = () => {
     }
 
     try {
-      setSaving(true);
       setError('');
 
-      const payload = trackingType === 'INDIVIDUAL' 
+      const payload = trackingType === 'INDIVIDUAL'
         ? {
             accepted_instances: selectedAccepted,
             rejected_instances: selectedRejected,
@@ -138,7 +140,8 @@ const AcknowledgmentForm = () => {
             rejection_reason: rejectionReason
           };
 
-      const response = await stockEntriesAPI.acknowledgeReceipt(id, payload);
+      // Use React Query mutation - this will automatically invalidate caches
+      const response = await acknowledgeMutation.mutateAsync({ id, data: payload });
 
       // Check if return entry was created for rejected items
       if (response.rejected && response.rejected.return_entry) {
@@ -153,8 +156,6 @@ const AcknowledgmentForm = () => {
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to process acknowledgment');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -450,10 +451,10 @@ const AcknowledgmentForm = () => {
           </button>
           <button
             type="submit"
-            disabled={saving || success}
+            disabled={acknowledgeMutation.isPending || success}
             className="flex items-center px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {saving ? (
+            {acknowledgeMutation.isPending ? (
               <>
                 <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
                 Processing...

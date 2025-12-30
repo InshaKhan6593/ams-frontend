@@ -319,7 +319,7 @@ const InspectionDetails = () => {
                         <span className="block text-xs text-gray-600 mt-0.5">Batch: {item.batch_number}</span>
                       )}
                     </td>
-                    <td className="px-2 py-2 text-xs text-gray-600">{item.tracking_type_display || 'N/A'}</td>
+                    <td className="px-2 py-2 text-xs text-gray-600">{item.item_tracking_type_display || 'N/A'}</td>
                     <td className="px-2 py-2 text-xs text-center text-gray-900">{item.tendered_quantity || 0}</td>
                     <td className="px-2 py-2 text-xs text-center text-red-600">{item.rejected_quantity || 0}</td>
                     <td className="px-2 py-2 text-xs text-center text-green-600">{item.accepted_quantity || 0}</td>

@@ -1,6 +1,6 @@
 // src/pages/Dashboard.jsx
 import { useAuth } from '../hooks/useAuth';
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Package,
@@ -19,84 +19,64 @@ import {
   Bell,
   ChevronRight,
 } from 'lucide-react';
-import { stockEntriesAPI } from '../api/stockEntries';
-import { inspectionsAPI } from '../api/inspections';
-import { itemsAPI, categoriesAPI } from '../api/items';
-import { locationsAPI } from '../api/locations';
+import { useDashboardStats } from '../hooks/queries/useDashboard';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    stockEntries: 0,
-    inspections: 0,
-    categories: 0,
-    items: 0,
-    locations: 0,
-    pendingAcknowledgments: 0,
-  });
-  const [recentActivity, setRecentActivity] = useState([]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  // Use React Query hook for automatic caching and background refetching
+  const { data: dashboardData, isLoading: loading, error } = useDashboardStats();
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-
-      const [
-        stockEntriesRes,
-        inspectionsRes,
-        categoriesRes,
-        itemsRes,
-        locationsRes,
-      ] = await Promise.all([
-        stockEntriesAPI.getAll().catch(() => ({ count: 0, results: [] })),
-        inspectionsAPI.getAll().catch(() => ({ count: 0, results: [] })),
-        categoriesAPI.getAll().catch(() => ({ count: 0, results: [] })),
-        itemsAPI.getAll().catch(() => ({ count: 0, results: [] })),
-        locationsAPI.getAll().catch(() => ({ count: 0, results: [] })),
-      ]);
-
-      const stockEntries = stockEntriesRes.results || [];
-      const pendingAck = stockEntries.filter(
-        (entry) => entry.status === 'PENDING_ACK'
-      ).length;
-
-      setStats({
-        stockEntries: stockEntriesRes.count || 0,
-        inspections: inspectionsRes.count || 0,
-        categories: Array.isArray(categoriesRes) ? categoriesRes.length : (categoriesRes.count || 0),
-        items: itemsRes.count || 0,
-        locations: Array.isArray(locationsRes) ? locationsRes.length : (locationsRes.count || 0),
-        pendingAcknowledgments: pendingAck,
-      });
-
-      const recentStockEntries = (stockEntries.slice(0, 3) || []).map((entry) => ({
-        type: 'stock',
-        title: `Stock Transfer: ${entry.item_name || 'Item'}`,
-        subtitle: `From ${entry.from_location_name || 'Unknown'} to ${entry.to_location_name || 'Unknown'}`,
-        time: entry.created_at,
-        status: entry.status,
-      }));
-
-      const recentInspections = ((inspectionsRes.results || []).slice(0, 2) || []).map((inspection) => ({
-        type: 'inspection',
-        title: `Inspection: ${inspection.certificate_no}`,
-        subtitle: `${inspection.department_name || 'Unknown Department'}`,
-        time: inspection.created_at,
-        status: inspection.stage,
-      }));
-
-      setRecentActivity([...recentStockEntries, ...recentInspections].slice(0, 5));
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
+  // Memoize computed values to prevent unnecessary recalculations
+  const stats = useMemo(() => {
+    if (!dashboardData) {
+      return {
+        stockEntries: 0,
+        inspections: 0,
+        categories: 0,
+        items: 0,
+        locations: 0,
+        pendingAcknowledgments: 0,
+      };
     }
-  };
+
+    const counts = dashboardData.counts || {};
+    const pendingTasks = dashboardData.pending_tasks || {};
+
+    return {
+      stockEntries: counts.total_stock_entries || 0,
+      inspections: counts.total_inspections || 0,
+      categories: counts.total_categories || 0,
+      items: counts.total_items || 0,
+      locations: counts.total_locations || 0,
+      pendingAcknowledgments: (pendingTasks.acknowledgments || 0) + (pendingTasks.returns || 0),
+    };
+  }, [dashboardData]);
+
+  const recentActivity = useMemo(() => {
+    if (!dashboardData) return [];
+
+    const recentActivityData = dashboardData.recent_activity || {};
+
+    const recentStockEntries = (recentActivityData.stock_entries || []).map((entry) => ({
+      type: 'stock',
+      title: `Stock Transfer: ${entry.item_name || 'Item'}`,
+      subtitle: `From ${entry.from_location_name || 'Unknown'} to ${entry.to_location_name || 'Unknown'}`,
+      time: entry.created_at,
+      status: entry.status,
+    }));
+
+    const recentInspections = (recentActivityData.inspections || []).map((inspection) => ({
+      type: 'inspection',
+      title: `Inspection: ${inspection.certificate_no}`,
+      subtitle: `${inspection.department_name || 'Unknown Department'}`,
+      time: inspection.created_at,
+      status: inspection.stage,
+    }));
+
+    return [...recentStockEntries, ...recentInspections].slice(0, 5);
+  }, [dashboardData]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();

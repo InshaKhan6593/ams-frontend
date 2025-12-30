@@ -2,14 +2,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, FileText, Package, CheckCircle, X, ExternalLink, RotateCcw, ArrowRightLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { usersAPI } from '../../api/users';
+import { usePendingTasks } from '../../hooks/queries/useDashboard';
 
 const NotificationBell = () => {
   const [showDropdown, setShowDropdown] = useState(false);
-  const [pendingTasks, setPendingTasks] = useState(null);
-  const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+
+  // Use React Query hook - automatically refetches every 2 minutes and caches results
+  const { data: pendingTasks, isLoading: loading, refetch } = usePendingTasks();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -23,33 +24,12 @@ const NotificationBell = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch pending tasks
-  const fetchPendingTasks = async () => {
-    try {
-      setLoading(true);
-      const data = await usersAPI.getMyPendingTasks();
-      setPendingTasks(data);
-    } catch (err) {
-      console.error('Error fetching pending tasks:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch on mount and when dropdown opens
-  useEffect(() => {
-    fetchPendingTasks();
-
-    // Refresh every 2 minutes
-    const interval = setInterval(fetchPendingTasks, 120000);
-    return () => clearInterval(interval);
-  }, []);
-
+  // Refetch when dropdown opens to show latest data
   useEffect(() => {
     if (showDropdown) {
-      fetchPendingTasks();
+      refetch();
     }
-  }, [showDropdown]);
+  }, [showDropdown, refetch]);
 
   const totalCount = pendingTasks?.counts?.total || 0;
 

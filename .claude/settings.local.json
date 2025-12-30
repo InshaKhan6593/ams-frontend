@@ -11,7 +11,14 @@
       "Bash(\"./venv/Scripts/python.exe\" manage.py makemigrations inventory --name add_unique_location_name)",
       "Bash(\"./venv/Scripts/python.exe\" -m py_compile \"C:\\\\Users\\\\Insha Khan\\\\ams_v3_user\\\\inventory\\\\views.py\")",
       "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/serializers.py)",
-      "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/models.py inventory/serializers.py)"
+      "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/models.py inventory/serializers.py)",
+      "Bash(\"./venv/Scripts/python.exe\" -m py_compile inventory/views.py ams/settings.py)",
+      "Bash(\"./venv/Scripts/python.exe\" -m py_compile user_management/models.py)",
+      "Bash(\"./venv/Scripts/python.exe\":*)",
+      "Bash(\"./venv/Scripts/python.exe\" -c \"\nwith open\\(''inventory/serializers.py'', ''rb''\\) as f:\n    lines = f.readlines\\(\\)\n    for i, line in enumerate\\(lines[1021:1026], 1022\\):\n        print\\(f''{i}: {line[:80]}''\n\\)\n\")",
+      "Bash(\"./venv/Scripts/python.exe\" -c \"\nwith open\\(''inventory/serializers.py'', ''rb''\\) as f:\n    content = f.read\\(\\)\n\n# Remove the corrupted byte sequence\ncorrupted = b''\\\\xc3\\\\x83\\\\xc6\\\\x92\\\\xc3\\\\x82\\\\xc2\\\\xa2\\\\xc3\\\\x83\\\\xc2\\\\xa2\\\\xc3\\\\xa2\\\\xe2\\\\x80\\\\x9a\\\\xc2\\\\xac\\\\xc3\\\\x82\\\\xc2\\\\xa0\\\\xc3\\\\x83\\\\xe2\\\\x80\\\\x9a\\\\xc3\\\\x82\\\\xc2\\\\x90 ''\ncontent = content.replace\\(corrupted, b''''\\)\n\nwith open\\(''inventory/serializers.py'', ''wb''\\) as f:\n    f.write\\(content\\)\nprint\\(''Fixed corrupted bytes''\\)\n\")",
+      "Bash(ls:*)",
+      "Bash(cd:*)"
     ]
   }
 }

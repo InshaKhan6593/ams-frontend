@@ -1,7 +1,7 @@
 // src/pages/StockEntries/StockEntriesList.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Package, ArrowRight, Clock, CheckCircle, XCircle, Eye, Loader } from 'lucide-react';
+import { Plus, Search, Filter, Package, ArrowRight, Clock, CheckCircle, XCircle, Eye, Loader, Download } from 'lucide-react';
 import { stockEntriesAPI } from '../../api/stockEntries';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
@@ -26,6 +26,7 @@ const StockEntriesList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [stockEntries, setStockEntries] = useState([]);
   const [nextPage, setNextPage] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -85,6 +86,24 @@ const StockEntriesList = () => {
     }
   };
 
+  const handleDownloadCSV = async () => {
+    try {
+      setDownloading(true);
+      // Pass current filters to export only filtered data
+      const params = {};
+      if (filters.entry_type) params.entry_type = filters.entry_type;
+      if (filters.status) params.status = filters.status;
+      if (debouncedSearch) params.search = debouncedSearch;
+
+      await stockEntriesAPI.exportCSV(params);
+    } catch (err) {
+      console.error('Failed to download CSV:', err);
+      alert('Failed to download CSV file');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const badges = {
       DRAFT: { bg: 'bg-gray-100', text: 'text-gray-700', icon: Clock },
@@ -133,13 +152,32 @@ const StockEntriesList = () => {
             Manage item transfers and movements ({totalCount} total)
           </p>
         </div>
-        <button
-          onClick={() => navigate('/dashboard/stock-entries/new')}
-          className="flex items-center gap-0.5 px-2 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          New Stock Entry
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadCSV}
+            disabled={downloading || totalCount === 0}
+            className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {downloading ? (
+              <>
+                <Loader className="h-3.5 w-3.5 animate-spin" />
+                Downloading...
+              </>
+            ) : (
+              <>
+                <Download className="h-3.5 w-3.5" />
+                Export CSV
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => navigate('/dashboard/stock-entries/new')}
+            className="flex items-center gap-0.5 px-2 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New Stock Entry
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -232,6 +270,15 @@ const StockEntriesList = () => {
                       </h3>
                       {getEntryTypeBadge(entry.entry_type)}
                       {getStatusBadge(entry.status)}
+                      {entry.item_tracking_type_display && (
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                          entry.item_tracking_type === 'INDIVIDUAL' ? 'bg-purple-100 text-purple-700' :
+                          entry.item_tracking_type === 'BATCH' ? 'bg-green-100 text-green-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {entry.item_tracking_type_display}
+                        </span>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 text-xs">

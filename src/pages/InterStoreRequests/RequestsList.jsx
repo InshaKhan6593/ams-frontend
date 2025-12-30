@@ -10,34 +10,40 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const RequestsList = () => {
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('outgoing'); // outgoing, incoming, all
-  
+  const [showCompleted, setShowCompleted] = useState(false); // New: toggle for completed requests
+
   const [outgoingRequests, setOutgoingRequests] = useState([]);
   const [incomingRequests, setIncomingRequests] = useState([]);
   const [allRequests, setAllRequests] = useState([]);
 
   useEffect(() => {
     fetchRequests();
-  }, []);
+  }, [showCompleted]); // Refetch when showCompleted changes
 
   const fetchRequests = async () => {
     try {
       setLoading(true);
       setError('');
-      
+
+      // Filter to exclude completed requests by default
+      const statusFilter = showCompleted
+        ? undefined // Show all statuses
+        : { exclude_completed: 'true' }; // Exclude ACKNOWLEDGED and CANCELLED
+
       const [outgoing, incoming, all] = await Promise.all([
-        interStoreRequestsAPI.getOutgoing(),
-        interStoreRequestsAPI.getIncoming(),
-        interStoreRequestsAPI.getAll()
+        interStoreRequestsAPI.getOutgoing(statusFilter),
+        interStoreRequestsAPI.getIncoming(statusFilter),
+        interStoreRequestsAPI.getAll(statusFilter)
       ]);
-      
+
       setOutgoingRequests(outgoing);
       setIncomingRequests(incoming);
       setAllRequests(all);
-      
+
     } catch (err) {
       console.error('Error fetching requests:', err);
       setError('Failed to load requests');
@@ -194,13 +200,24 @@ const RequestsList = () => {
             Request and manage item transfers between stores
           </p>
         </div>
-        <button
-          onClick={() => navigate('/dashboard/store-requests/new')}
-          className="flex items-center gap-1 px-3 py-2 bg-primary-600 text-white text-xs font-medium rounded-lg hover:bg-primary-700"
-        >
-          <Plus className="h-3 w-3" />
-          New Request
-        </button>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:text-gray-900">
+            <input
+              type="checkbox"
+              checked={showCompleted}
+              onChange={(e) => setShowCompleted(e.target.checked)}
+              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span className="font-medium">Show completed</span>
+          </label>
+          <button
+            onClick={() => navigate('/dashboard/store-requests/new')}
+            className="flex items-center gap-1 px-3 py-2 bg-primary-600 text-white text-xs font-medium rounded-lg hover:bg-primary-700"
+          >
+            <Plus className="h-3 w-3" />
+            New Request
+          </button>
+        </div>
       </div>
 
       {error && (

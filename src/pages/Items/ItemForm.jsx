@@ -5,18 +5,27 @@ import { ArrowLeft, Save, Package, Box, Layers } from 'lucide-react';
 import { itemsAPI, categoriesAPI } from '../../api/items';
 import { locationsAPI } from '../../api/locations';
 import { useAuth } from '../../hooks/useAuth';
+import { canCreateCategoriesOrItems } from '../../utils/permissions';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const ItemForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, permissions: userPermissions } = useAuth();
   const isEditMode = Boolean(id);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Check permission on mount
+  useEffect(() => {
+    if (!canCreateCategoriesOrItems(currentUser, userPermissions)) {
+      alert('You do not have permission to create or edit items');
+      navigate('/dashboard/items');
+    }
+  }, [currentUser, userPermissions, navigate]);
 
   // Step 1: Select tracking type (only for new items)
   const [selectedTrackingType, setSelectedTrackingType] = useState(null);

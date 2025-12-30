@@ -7,6 +7,7 @@ import { locationsAPI } from '../../api/locations';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import PermissionSelector from '../../components/PermissionSelector';
 
 const UserForm = () => {
   const navigate = useNavigate();
@@ -32,6 +33,9 @@ const UserForm = () => {
     assigned_locations: [],
     custom_roles: [],
   });
+
+  // Custom permissions (for new users only)
+  const [customPermissions, setCustomPermissions] = useState({});
 
   // Available locations based on role
   const [availableLocations, setAvailableLocations] = useState([]);
@@ -213,6 +217,11 @@ const UserForm = () => {
     try {
       setSaving(true);
 
+      // Filter out empty custom permissions
+      const filteredCustomPerms = Object.fromEntries(
+        Object.entries(customPermissions).filter(([_, value]) => value === true)
+      );
+
       const submitData = {
         role: formData.role,
         phone: formData.phone,
@@ -244,6 +253,11 @@ const UserForm = () => {
         submitData.email = formData.email;
         submitData.first_name = formData.first_name;
         submitData.last_name = formData.last_name;
+
+        // Add custom permissions if any are selected
+        if (Object.keys(filteredCustomPerms).length > 0) {
+          submitData.custom_permissions = filteredCustomPerms;
+        }
 
         await usersAPI.createUser(submitData);
         setSuccess('User created successfully!');
@@ -538,8 +552,25 @@ const UserForm = () => {
             </div>
           )}
 
-          {/* Custom Roles Section */}
-          {canManageCustomRoles() && (
+          {/* Custom Permissions Section (for new users only) */}
+          {!isEditMode && formData.role && (
+            <div className="bg-white rounded-lg border border-gray-200 p-2.5 mt-3">
+              <h3 className="text-xs font-semibold text-gray-900 mb-1">
+                Additional Permissions (Optional)
+              </h3>
+              <p className="text-xs text-gray-600 mb-2">
+                Base role permissions are locked. Select additional permissions to grant custom access.
+              </p>
+              <PermissionSelector
+                selectedRole={formData.role}
+                value={customPermissions}
+                onChange={setCustomPermissions}
+              />
+            </div>
+          )}
+
+          {/* Custom Roles Section (for existing users only) */}
+          {isEditMode && canManageCustomRoles() && (
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-2">
                 Custom Roles (Optional)

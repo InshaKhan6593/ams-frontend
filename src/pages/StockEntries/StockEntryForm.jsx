@@ -119,7 +119,7 @@ const StockEntryForm = () => {
       });
       
       setSelectedItem(data.item);
-      setTrackingType(data.item?.tracking_type);
+      setTrackingType(data.item_tracking_type);
 
       // Set search query for item dropdown
       if (data.item) {
@@ -155,6 +155,20 @@ const StockEntryForm = () => {
       setUserRole(data.user_role);
       setCanIssueUpward(data.can_issue_upward || false);
       setUpwardTarget(data.upward_target);
+
+      // Auto-populate from_location and to_location with user's default location
+      if (data.default_from_location && !isEditMode) {
+        setFormData(prev => ({
+          ...prev,
+          from_location: data.default_from_location.id,
+          to_location: data.default_from_location.id  // For RECEIPT entries
+        }));
+
+        // For RECEIPT entries, also fetch receipt source stores
+        if (formData.entry_type === 'RECEIPT') {
+          fetchReceiptSourceStores(data.default_from_location.id);
+        }
+      }
 
       // For RECEIPT entries, we'll use fromLocations directly
     } catch (err) {
@@ -346,12 +360,27 @@ const StockEntryForm = () => {
 
   const handleInstanceToggle = (instanceId) => {
     setSelectedInstances(prev => {
-      if (prev.includes(instanceId)) {
-        return prev.filter(id => id !== instanceId);
-      } else {
-        return [...prev, instanceId];
-      }
+      const newSelection = prev.includes(instanceId)
+        ? prev.filter(id => id !== instanceId)
+        : [...prev, instanceId];
+
+      // Update quantity to match manual selection
+      setFormData(prevForm => ({ ...prevForm, quantity: newSelection.length }));
+
+      return newSelection;
     });
+  };
+
+  const handleQuantityChange = (value) => {
+    const qty = parseInt(value) || 0;
+
+    if (trackingType === 'INDIVIDUAL') {
+      // Auto-select first N instances based on quantity
+      const newSelection = availableInstances.slice(0, qty).map(i => i.id);
+      setSelectedInstances(newSelection);
+    }
+
+    setFormData(prev => ({ ...prev, quantity: qty }));
   };
 
   const handleBatchAllocation = (batchId, quantity) => {
@@ -389,8 +418,12 @@ const StockEntryForm = () => {
       }
 
       if (trackingType === 'INDIVIDUAL') {
-        if (selectedInstances.length === 0) {
-          setError('Please select at least one item instance');
+        if (selectedInstances.length === 0 || formData.quantity === 0) {
+          setError('Please select at least one item instance (enter quantity or manually check boxes)');
+          return;
+        }
+        if (selectedInstances.length !== formData.quantity) {
+          setError(`Selected instances (${selectedInstances.length}) must match quantity (${formData.quantity})`);
           return;
         }
       }
@@ -432,8 +465,12 @@ const StockEntryForm = () => {
       }
 
       if (trackingType === 'INDIVIDUAL') {
-        if (selectedInstances.length === 0) {
-          setError('Please select at least one item instance');
+        if (selectedInstances.length === 0 || formData.quantity === 0) {
+          setError('Please select at least one item instance (enter quantity or manually check boxes)');
+          return;
+        }
+        if (selectedInstances.length !== formData.quantity) {
+          setError(`Selected instances (${selectedInstances.length}) must match quantity (${formData.quantity})`);
           return;
         }
       }
@@ -597,22 +634,39 @@ const StockEntryForm = () => {
               <MapPin className="inline h-3 w-3 mr-1" />
               From Location (Source Store) <span className="text-red-500">*</span>
             </label>
-            <select
-              value={formData.from_location}
-              onChange={(e) => handleChange('from_location', e.target.value)}
-              className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              required
-              disabled={isEditMode}
-            >
-              <option value="">Select source store</option>
-              {fromLocations.map(loc => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.name} {loc.is_main_store ? '(Main Store)' : ''}
-                </option>
-              ))}
-            </select>
-            {isEditMode && (
-              <p className="text-xs text-gray-500 mt-0.5">Source location cannot be changed</p>
+            {fromLocations.length === 1 ? (
+              <>
+                <input
+                  type="text"
+                  value={fromLocations[0]?.name + (fromLocations[0]?.is_main_store ? ' (Main Store)' : '')}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                  disabled
+                  readOnly
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Your assigned location
+                </p>
+              </>
+            ) : (
+              <>
+                <select
+                  value={formData.from_location}
+                  onChange={(e) => handleChange('from_location', e.target.value)}
+                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  required
+                  disabled={isEditMode}
+                >
+                  <option value="">Select source store</option>
+                  {fromLocations.map(loc => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name} {loc.is_main_store ? '(Main Store)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {isEditMode && (
+                  <p className="text-xs text-gray-500 mt-0.5">Source location cannot be changed</p>
+                )}
+              </>
             )}
           </div>
         )}
@@ -625,22 +679,39 @@ const StockEntryForm = () => {
                 <MapPin className="inline h-3 w-3 mr-1" />
                 Receiving Store (Your Store) <span className="text-red-500">*</span>
               </label>
-              <select
-                value={formData.to_location}
-                onChange={(e) => handleChange('to_location', e.target.value)}
-                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-                disabled={isEditMode}
-              >
-                <option value="">Select receiving store</option>
-                {fromLocations.map(loc => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name} {loc.is_main_store ? '(Main Store)' : ''}
-                  </option>
-                ))}
-              </select>
-              {isEditMode && (
-                <p className="text-xs text-gray-500 mt-0.5">Receiving store cannot be changed</p>
+              {fromLocations.length === 1 ? (
+                <>
+                  <input
+                    type="text"
+                    value={fromLocations[0]?.name + (fromLocations[0]?.is_main_store ? ' (Main Store)' : '')}
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                    disabled
+                    readOnly
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Your assigned location
+                  </p>
+                </>
+              ) : (
+                <>
+                  <select
+                    value={formData.to_location}
+                    onChange={(e) => handleChange('to_location', e.target.value)}
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    required
+                    disabled={isEditMode}
+                  >
+                    <option value="">Select receiving store</option>
+                    {fromLocations.map(loc => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name} {loc.is_main_store ? '(Main Store)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {isEditMode && (
+                    <p className="text-xs text-gray-500 mt-0.5">Receiving store cannot be changed</p>
+                  )}
+                </>
               )}
             </div>
 
@@ -787,9 +858,71 @@ const StockEntryForm = () => {
                 <strong>Available at this store:</strong> {availableInstances.length} instance(s)
               </p>
             </div>
-            <h3 className="text-xs font-semibold text-gray-900 mb-2">
-              Select Items to Transfer ({selectedInstances.length} selected)
-            </h3>
+
+            {/* Quantity Input for Auto-Selection */}
+            <div className="mb-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+              <label className="block text-xs font-semibold text-gray-900 mb-1.5">
+                Quick Select by Quantity
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max={availableInstances.length}
+                  value={formData.quantity}
+                  onChange={(e) => handleQuantityChange(e.target.value)}
+                  className="w-24 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="0"
+                />
+                <div className="flex-1">
+                  <p className="text-xs text-gray-700">
+                    Enter quantity to auto-select first <strong>{formData.quantity || 0}</strong> instance(s)
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Or manually select specific instances below
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-gray-900">
+                Manual Selection ({selectedInstances.length} selected)
+              </h3>
+
+              {availableInstances.length > 0 && (
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedInstances(availableInstances.map(i => i.id));
+                      setFormData(prev => ({ ...prev, quantity: availableInstances.length }));
+                    }}
+                    className="px-2 py-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedInstances([]);
+                      setFormData(prev => ({ ...prev, quantity: 0 }));
+                    }}
+                    className="px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {selectedInstances.length === 0 && availableInstances.length > 0 && (
+              <div className="mb-2 p-2 bg-amber-50 border border-amber-300 rounded-lg">
+                <p className="text-xs text-amber-800 font-medium">
+                  ⚠️ Please select instances by entering quantity above OR by manually checking boxes below
+                </p>
+              </div>
+            )}
 
             {availableInstances.length === 0 ? (
               <div className="text-center py-4 text-gray-500">
@@ -801,13 +934,17 @@ const StockEntryForm = () => {
                 {availableInstances.map(instance => (
                   <label
                     key={instance.id}
-                    className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                    className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer transition-all ${
+                      selectedInstances.includes(instance.id)
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={selectedInstances.includes(instance.id)}
                       onChange={() => handleInstanceToggle(instance.id)}
-                      className="h-3 w-3 text-primary-600 focus:ring-primary-500"
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 rounded"
                     />
                     <div className="flex-1">
                       <p className="text-xs font-medium text-gray-900">{instance.instance_code}</p>
@@ -815,6 +952,11 @@ const StockEntryForm = () => {
                         Status: {instance.status} | QR: {instance.qr_code || 'N/A'}
                       </p>
                     </div>
+                    {selectedInstances.includes(instance.id) && (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-primary-600 text-white rounded-full">
+                        Selected
+                      </span>
+                    )}
                   </label>
                 ))}
               </div>

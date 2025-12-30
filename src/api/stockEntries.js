@@ -94,6 +94,24 @@ export const stockEntriesAPI = {
     const response = await apiClient.post(`/stock-entries/${id}/acknowledge_return/`, data);
     return response.data;
   },
+
+  // Export all entries to CSV
+  exportCSV: async (params = {}) => {
+    const response = await apiClient.get('/stock-entries/export_csv/', {
+      params,
+      responseType: 'blob' // Important for file download
+    });
+
+    // Create blob link to download
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `stock_entries_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
 };
 
 export default stockEntriesAPI;

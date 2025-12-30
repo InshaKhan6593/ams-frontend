@@ -1,10 +1,12 @@
 // src/pages/Locations/LocationsList.jsx
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, MapPin, Building2, Store, Filter, Edit } from 'lucide-react';
-import { locationsAPI } from '../../api/locations';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useLocations } from '../../hooks/queries';
+import { useDebounce } from '../../utils/debounce';
+import { SkeletonList } from '../../components/common/Skeleton';
 import { PERMISSIONS } from '../../constants/permissions';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
@@ -12,50 +14,45 @@ const LocationsList = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const { hasPermission } = usePermissions();
-  const [locations, setLocations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => {
-    fetchLocations();
-  }, []);
+  // Debounce search to reduce API calls
+  const debouncedSearch = useDebounce(searchTerm, 500);
 
-  const fetchLocations = async () => {
-    try {
-      setLoading(true);
-      const data = await locationsAPI.getLocations();
-      setLocations(Array.isArray(data) ? data : data.results || []);
-      setError('');
-    } catch (err) {
-      setError('Failed to load locations');
-      console.error('Error fetching locations:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Build query params
+  const queryParams = useMemo(() => {
+    const params = {};
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (typeFilter) params.location_type = typeFilter;
+    return params;
+  }, [debouncedSearch, typeFilter]);
 
-  // Filter locations
-  const filteredLocations = locations.filter((location) => {
-    const matchesSearch = 
-      location.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      location.code.toLowerCase().includes(searchTerm.toLowerCase());
+  // Fetch locations with React Query (automatic caching)
+  const { data: locations = [], isLoading: loading, error, refetch } = useLocations(queryParams);
 
-    const matchesType = !typeFilter || location.location_type === typeFilter;
+  // Filter locations (client-side)
+  const filteredLocations = useMemo(() => {
+    return locations.filter((location) => {
+      const matchesSearch = !searchTerm ||
+        location.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        location.code.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && location.is_active) ||
-      (statusFilter === 'inactive' && !location.is_active) ||
-      (statusFilter === 'standalone' && location.is_standalone) ||
-      (statusFilter === 'store' && location.is_store);
+      const matchesType = !typeFilter || location.location_type === typeFilter;
 
-    return matchesSearch && matchesType && matchesStatus;
-  });
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && location.is_active) ||
+        (statusFilter === 'inactive' && !location.is_active) ||
+        (statusFilter === 'standalone' && location.is_standalone) ||
+        (statusFilter === 'store' && location.is_store);
+
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }, [locations, searchTerm, typeFilter, statusFilter]);
 
   const typeColors = {
     DEPARTMENT: 'bg-blue-100 text-blue-700',
@@ -72,8 +69,14 @@ const LocationsList = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="large" />
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-sm font-bold text-gray-900">Locations</h1>
+            <p className="text-xs text-gray-600 mt-0.5">Loading locations...</p>
+          </div>
+        </div>
+        <SkeletonList count={8} />
       </div>
     );
   }

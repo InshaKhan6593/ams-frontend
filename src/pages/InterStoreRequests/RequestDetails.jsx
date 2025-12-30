@@ -396,8 +396,13 @@ const RequestDetails = () => {
   };
 
   const canAcknowledge = () => {
-    return (request?.status === 'DISPATCHED' || request?.status === 'PARTIALLY_DISPATCHED') &&
-           user?.accessible_stores?.some(s => s.id === request.requesting_store);
+    // Acknowledgment is now handled via the Acknowledgments section (stock entries)
+    // This redundant acknowledgment flow is disabled
+    return false;
+
+    // OLD LOGIC (disabled to prevent redundancy):
+    // return (request?.status === 'DISPATCHED' || request?.status === 'PARTIALLY_DISPATCHED') &&
+    //        user?.accessible_stores?.some(s => s.id === request.requesting_store);
   };
 
   const canCancel = () => {
@@ -456,12 +461,31 @@ const RequestDetails = () => {
       {!availabilityMode && !dispatchMode && !ackMode && (
         <div className="space-y-2">
           {/* Info banner for dispatched/completed requests */}
-          {(request?.status === 'DISPATCHED' || request?.status === 'PARTIALLY_DISPATCHED' ||
-            request?.status === 'ACKNOWLEDGED' || request?.status === 'REJECTED') && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-2 py-1.5 rounded-lg text-xs">
-              <strong>Note:</strong> This request has been dispatched. Editing availability is no longer allowed.
-              {request?.status === 'ACKNOWLEDGED' && ' Items have been acknowledged.'}
-              {request?.status === 'REJECTED' && ' Items have been rejected.'}
+          {(request?.status === 'DISPATCHED' || request?.status === 'PARTIALLY_DISPATCHED') && (
+            <div className="bg-purple-50 border border-purple-300 text-purple-800 px-3 py-2 rounded-lg text-xs">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold mb-1">Items Dispatched - Acknowledge in Acknowledgments Section</p>
+                  <p className="text-purple-700">
+                    Stock entries have been created for the dispatched items. Please go to the
+                    <strong> Acknowledgments</strong> section to accept or reject the received items.
+                    This request will automatically be marked as complete once all items are acknowledged.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {request?.status === 'ACKNOWLEDGED' && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-2 py-1.5 rounded-lg text-xs">
+              <strong>✓ Completed:</strong> All items have been acknowledged. This request is complete.
+            </div>
+          )}
+
+          {request?.status === 'REJECTED' && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-2 py-1.5 rounded-lg text-xs">
+              <strong>✗ Rejected:</strong> Items have been rejected.
             </div>
           )}
 
@@ -768,51 +792,144 @@ const RequestDetails = () => {
                   {/* INDIVIDUAL - Instance Selection */}
                   {trackingType === 'INDIVIDUAL' && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Select Instances to Dispatch:
-                      </label>
+                      {/* Quick Select by Quantity */}
+                      {stock.instances && stock.instances.length > 0 && (
+                        <div className="mb-3 p-2.5 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+                          <label className="block text-xs font-semibold text-gray-900 mb-1.5">
+                            Quick Select by Quantity
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              max={Math.min(stock.instances.length, item.requested_quantity)}
+                              value={dispatchData[item.id]?.instance_ids?.length || 0}
+                              onChange={(e) => {
+                                const qty = parseInt(e.target.value) || 0;
+                                const newInstanceIds = stock.instances.slice(0, qty).map(i => i.id);
+
+                                setDispatchData(prev => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    item_id: item.id,
+                                    instance_ids: newInstanceIds,
+                                    dispatched_quantity: newInstanceIds.length.toString()
+                                  }
+                                }));
+                              }}
+                              className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                            <div className="flex-1">
+                              <p className="text-xs text-gray-700">
+                                Auto-select first <strong>{dispatchData[item.id]?.instance_ids?.length || 0}</strong> instance(s)
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Max: {Math.min(stock.instances.length, item.requested_quantity)} (requested: {item.requested_quantity})
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-medium text-gray-700">
+                          Manual Selection ({dispatchData[item.id]?.instance_ids?.length || 0} selected)
+                        </label>
+
+                        {stock.instances && stock.instances.length > 0 && (
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const maxQty = Math.min(stock.instances.length, item.requested_quantity);
+                                const allIds = stock.instances.slice(0, maxQty).map(i => i.id);
+                                setDispatchData(prev => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    item_id: item.id,
+                                    instance_ids: allIds,
+                                    dispatched_quantity: allIds.length.toString()
+                                  }
+                                }));
+                              }}
+                              className="px-2 py-0.5 text-xs font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded transition-colors"
+                            >
+                              Select Max
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDispatchData(prev => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    item_id: item.id,
+                                    instance_ids: [],
+                                    dispatched_quantity: '0'
+                                  }
+                                }));
+                              }}
+                              className="px-2 py-0.5 text-xs font-medium text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
                       {!stock.instances ? (
                         <p className="text-xs text-orange-600">Loading instances...</p>
                       ) : stock.instances.length > 0 ? (
                         <div className="space-y-1 max-h-40 overflow-y-auto">
-                          {stock.instances.map((instance) => (
-                            <label
-                              key={instance.id}
-                              className="flex items-start gap-2 p-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={dispatchData[item.id]?.instance_ids?.includes(instance.id) || false}
-                                onChange={(e) => {
-                                  const checked = e.target.checked;
-                                  setDispatchData(prev => {
-                                    const current = prev[item.id] || { item_id: item.id, instance_ids: [] };
-                                    const instanceIds = checked
-                                      ? [...(current.instance_ids || []), instance.id]
-                                      : (current.instance_ids || []).filter(id => id !== instance.id);
+                          {stock.instances.map((instance) => {
+                            const isSelected = dispatchData[item.id]?.instance_ids?.includes(instance.id) || false;
+                            return (
+                              <label
+                                key={instance.id}
+                                className={`flex items-start gap-2 p-1.5 rounded cursor-pointer border transition-all ${
+                                  isSelected
+                                    ? 'bg-primary-50 border-primary-500'
+                                    : 'hover:bg-gray-50 border-transparent'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setDispatchData(prev => {
+                                      const current = prev[item.id] || { item_id: item.id, instance_ids: [] };
+                                      const instanceIds = checked
+                                        ? [...(current.instance_ids || []), instance.id]
+                                        : (current.instance_ids || []).filter(id => id !== instance.id);
 
-                                    return {
-                                      ...prev,
-                                      [item.id]: {
-                                        ...current,
-                                        instance_ids: instanceIds,
-                                        dispatched_quantity: instanceIds.length.toString()
-                                      }
-                                    };
-                                  });
-                                }}
-                                className="mt-0.5 h-3 w-3"
-                              />
-                              <div className="flex-1">
-                                <span className="text-xs text-gray-900 font-medium">
-                                  {instance.instance_code}
-                                </span>
-                                <span className="text-xs text-gray-600 ml-2">
-                                  {instance.location_name}
-                                </span>
-                              </div>
-                            </label>
-                          ))}
+                                      return {
+                                        ...prev,
+                                        [item.id]: {
+                                          ...current,
+                                          instance_ids: instanceIds,
+                                          dispatched_quantity: instanceIds.length.toString()
+                                        }
+                                      };
+                                    });
+                                  }}
+                                  className="mt-0.5 h-4 w-4 text-primary-600 focus:ring-primary-500 rounded"
+                                />
+                                <div className="flex-1">
+                                  <span className="text-xs text-gray-900 font-medium">
+                                    {instance.instance_code}
+                                  </span>
+                                  <span className="text-xs text-gray-600 ml-2">
+                                    {instance.location_name}
+                                  </span>
+                                </div>
+                                {isSelected && (
+                                  <span className="px-1.5 py-0.5 text-xs font-medium bg-primary-600 text-white rounded-full">
+                                    Selected
+                                  </span>
+                                )}
+                              </label>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="p-2 bg-red-50 border border-red-200 rounded">
@@ -823,8 +940,8 @@ const RequestDetails = () => {
                         </div>
                       )}
                       {dispatchData[item.id]?.instance_ids?.length > 0 && (
-                        <p className="text-xs text-green-600 mt-1">
-                          Selected: {dispatchData[item.id].instance_ids.length} instance(s)
+                        <p className="text-xs text-green-600 font-medium mt-1.5">
+                          ✓ Selected: {dispatchData[item.id].instance_ids.length} instance(s)
                         </p>
                       )}
                     </div>

@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { Link2, Plus, Search, Eye, Check, X, AlertCircle, Package, FolderPlus, ChevronDown, ChevronUp, Unlink, Edit2, Save } from 'lucide-react';
 import { inspectionsAPI } from '../../api/inspections';
 import { itemsAPI, categoriesAPI } from '../../api/items';
-import { locationsAPI } from '../../api/locations';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { ACCOUNTING_UNITS, UNIT_GROUPS } from '../../constants/units';
 
@@ -927,6 +926,7 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
       {showCreateModal && selectedItem && (
         <CreateItemModal
           inspectionItem={selectedItem}
+          inspection={inspection}
           onClose={() => {
             setShowCreateModal(false);
             setSelectedItem(null);
@@ -958,14 +958,14 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
 };
 
 // Create Item Modal Component
-const CreateItemModal = ({ inspectionItem, onClose, onCreate, loading }) => {
+const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loading }) => {
   const [formData, setFormData] = useState({
     name: inspectionItem.item_description || inspectionItem.description || '',
     category: '',
     description: inspectionItem.item_specifications || inspectionItem.specifications || '',
     acct_unit: inspectionItem.unit || '',
     specifications: inspectionItem.item_specifications || inspectionItem.specifications || '',
-    default_location: '',
+    default_location: inspection?.department || '',
     // Central Register Details
     central_register_no: '',
     central_register_page_no: '',
@@ -979,13 +979,11 @@ const CreateItemModal = ({ inspectionItem, onClose, onCreate, loading }) => {
   });
   const [allCategories, setAllCategories] = useState([]);
   const [hierarchicalCategories, setHierarchicalCategories] = useState([]);
-  const [locations, setLocations] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
   const [selectedCategoryTrackingType, setSelectedCategoryTrackingType] = useState(null);
 
   useEffect(() => {
     fetchAllCategories();
-    fetchLocations();
   }, []);
 
   const fetchAllCategories = async () => {
@@ -1029,16 +1027,6 @@ const CreateItemModal = ({ inspectionItem, onClose, onCreate, loading }) => {
     }
   };
 
-  const fetchLocations = async () => {
-    try {
-      const data = await locationsAPI.getLocations();
-      // Handle both array and paginated response formats
-      const locationsList = Array.isArray(data) ? data : (data.results || []);
-      setLocations(locationsList.filter(loc => loc.is_standalone && loc.is_active));
-    } catch (err) {
-      console.error('Error fetching locations:', err);
-    }
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -1254,20 +1242,16 @@ const CreateItemModal = ({ inspectionItem, onClose, onCreate, loading }) => {
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Default Location <span className="text-red-500">*</span>
               </label>
-              <select
-                name="default_location"
-                value={formData.default_location}
-                onChange={handleChange}
-                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-              >
-                <option value="">Select location</option>
-                {locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="text"
+                value={inspection?.department_name || 'Loading...'}
+                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
+                disabled
+                readOnly
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Items are automatically assigned to the department that initiated this inspection
+              </p>
             </div>
 
             <div className="md:col-span-2">

@@ -4,18 +4,27 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Tag } from 'lucide-react';
 import { categoriesAPI } from '../../api/items';
 import { useAuth } from '../../hooks/useAuth';
+import { canCreateCategoriesOrItems } from '../../utils/permissions';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const CategoryForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, permissions: userPermissions } = useAuth();
   const isEditMode = Boolean(id);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Check permission on mount
+  useEffect(() => {
+    if (!canCreateCategoriesOrItems(currentUser, userPermissions)) {
+      alert('You do not have permission to create or edit categories');
+      navigate('/dashboard/categories');
+    }
+  }, [currentUser, userPermissions, navigate]);
 
   // Form data
   const [formData, setFormData] = useState({

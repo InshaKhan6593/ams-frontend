@@ -142,7 +142,7 @@ const StockEntryDetails = () => {
               <p className="text-xs text-gray-600">Item</p>
               <p className="text-xs font-medium text-gray-900">{entry.item_name}</p>
               <p className="text-xs text-gray-600 mt-0.5">
-                Tracking: {entry.item_tracking_type_display}
+                Tracking: {entry.item_tracking_type_display || entry.item_tracking_type || 'N/A'}
               </p>
             </div>
           </div>

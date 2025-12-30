@@ -1,13 +1,16 @@
 // src/pages/Categories/CategoriesList.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Tag, Edit, Trash2, FolderTree, Box, Package } from 'lucide-react';
+import { Plus, Search, Tag, Edit, Trash2, FolderTree, Box, Package, AlertCircle } from 'lucide-react';
 import { categoriesAPI } from '../../api/items';
 import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
+import { canCreateCategoriesOrItems, canDeleteCategoriesOrItems, getCannotCreateMessage } from '../../utils/permissions';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const CategoriesList = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, permissions: userPermissions } = useAuth();
+  const { isSystemAdmin } = usePermissions();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -85,6 +88,10 @@ const CategoriesList = () => {
     );
   }
 
+  // Check if user can create categories
+  const canCreate = canCreateCategoriesOrItems(currentUser, userPermissions);
+  const canDelete = canDeleteCategoriesOrItems(currentUser);
+
   return (
     <div className="space-y-2">
       {/* Header */}
@@ -93,14 +100,38 @@ const CategoriesList = () => {
           <h1 className="text-sm font-bold text-gray-900">Categories</h1>
           <p className="text-xs text-gray-600 mt-0.5">Manage item categories and tracking types</p>
         </div>
-        <Link
-          to="/dashboard/categories/new"
-          className="flex items-center gap-0.5 px-2 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          New Category
-        </Link>
+        {canCreate ? (
+          <Link
+            to="/dashboard/categories/new"
+            className="flex items-center gap-0.5 px-2 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Category
+          </Link>
+        ) : (
+          <button
+            onClick={() => alert(getCannotCreateMessage(currentUser))}
+            className="flex items-center gap-0.5 px-2 py-1 bg-gray-300 text-gray-600 text-xs rounded-lg cursor-not-allowed"
+            title={getCannotCreateMessage(currentUser)}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Category
+          </button>
+        )}
       </div>
+
+      {/* Permission Warning */}
+      {!canCreate && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-xs font-medium text-yellow-900">Limited Access</p>
+            <p className="text-xs text-yellow-700 mt-0.5">
+              {getCannotCreateMessage(currentUser)}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
@@ -340,20 +371,27 @@ const CategoriesList = () => {
                       </td>
                       <td className="px-2 py-1 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Link
-                            to={`/dashboard/categories/${category.id}`}
-                            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(category)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {canCreate && (
+                            <Link
+                              to={`/dashboard/categories/${category.id}`}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </Link>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDelete(category)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {!canCreate && !canDelete && (
+                            <span className="text-xs text-gray-400 px-2">Read-only</span>
+                          )}
                         </div>
                       </td>
                     </tr>

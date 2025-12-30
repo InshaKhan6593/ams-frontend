@@ -70,6 +70,20 @@ export const usersAPI = {
     return response.data;
   },
 
+  // Get dashboard stats (optimized - replaces 5 separate API calls)
+  getDashboardStats: async () => {
+    const response = await apiClient.get('/users/dashboard/');
+    return response.data;
+  },
+
+  // Get role base permissions
+  getRolePermissions: async (role) => {
+    const response = await apiClient.get('/users/role_permissions/', {
+      params: { role }
+    });
+    return response.data;
+  },
+
   // Get role options
   getRoles: () => {
     return [

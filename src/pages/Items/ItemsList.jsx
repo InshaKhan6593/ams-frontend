@@ -1,50 +1,53 @@
 // src/pages/Items/ItemsList.jsx
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Package, Edit, Trash2, Box, Tag, TrendingUp } from 'lucide-react';
-import { itemsAPI } from '../../api/items';
+import { Plus, Search, Package, Edit, Trash2, Box, Tag, TrendingUp, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useItems } from '../../hooks/queries';
+import { useDebounce } from '../../utils/debounce';
+import { SkeletonList } from '../../components/common/Skeleton';
+import { itemsAPI } from '../../api/items';
+import {
+  canCreateCategoriesOrItems,
+  canDeleteCategoriesOrItems,
+  getCannotCreateMessage
+} from '../../utils/permissions';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const ItemsList = () => {
-  const { user: currentUser } = useAuth();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { user: currentUser, permissions: userPermissions } = useAuth();
+  const canCreate = canCreateCategoriesOrItems(currentUser, userPermissions);
+  const canDelete = canDeleteCategoriesOrItems(currentUser);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [trackingFilter, setTrackingFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [categories, setCategories] = useState([]);
 
-  useEffect(() => {
-    fetchItems();
-  }, []);
+  // Debounce search to reduce API calls
+  const debouncedSearch = useDebounce(searchTerm, 500);
 
-  const fetchItems = async () => {
-    try {
-      setLoading(true);
-      const data = await itemsAPI.getAll();
-      // Handle both array and paginated response formats
-      const itemsList = Array.isArray(data) ? data : (data.results || []);
-      setItems(itemsList);
+  // Build query params
+  const queryParams = useMemo(() => {
+    const params = {};
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (categoryFilter) params.category = categoryFilter;
+    if (trackingFilter) params.tracking_type = trackingFilter;
+    return params;
+  }, [debouncedSearch, categoryFilter, trackingFilter]);
 
-      // Extract unique categories from the normalized items list
-      const uniqueCategories = [...new Map(
-        itemsList.map(item => [item.category, {
-          id: item.category,
-          name: item.category_name
-        }])
-      ).values()];
-      setCategories(uniqueCategories);
-      setError('');
-    } catch (err) {
-      setError('Failed to load items');
-      console.error('Error fetching items:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch items with React Query (automatic caching)
+  const { data: items = [], isLoading: loading, error, refetch } = useItems(queryParams);
+
+  // Extract unique categories from items
+  const categories = useMemo(() => {
+    return [...new Map(
+      items.map(item => [item.category, {
+        id: item.category,
+        name: item.category_name
+      }])
+    ).values()];
+  }, [items]);
 
   const handleDelete = async (item) => {
     if (!window.confirm(`Are you sure you want to delete "${item.name}"?`)) {
@@ -53,31 +56,33 @@ const ItemsList = () => {
 
     try {
       await itemsAPI.delete(item.id);
-      fetchItems();
+      refetch(); // Refresh data after delete
     } catch (err) {
       console.error('Failed to delete item:', err);
       alert('Failed to delete item. It may be in use.');
     }
   };
 
-  // Filter items
-  const filteredItems = items.filter((item) => {
-    const matchesSearch = 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Filter items (client-side)
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchesSearch = !searchTerm ||
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesCategory = !categoryFilter || item.category === parseInt(categoryFilter);
-    const matchesTracking = !trackingFilter || item.category_tracking_type === trackingFilter;
-    const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && item.is_active) ||
-      (statusFilter === 'inactive' && !item.is_active) ||
-      (statusFilter === 'low_stock' && !item.requires_individual_tracking && 
-       item.available_quantity <= item.reorder_level && item.reorder_level > 0);
+      const matchesCategory = !categoryFilter || item.category === parseInt(categoryFilter);
+      const matchesTracking = !trackingFilter || item.category_tracking_type === trackingFilter;
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && item.is_active) ||
+        (statusFilter === 'inactive' && !item.is_active) ||
+        (statusFilter === 'low_stock' && !item.requires_individual_tracking &&
+         item.available_quantity <= item.reorder_level && item.reorder_level > 0);
 
-    return matchesSearch && matchesCategory && matchesTracking && matchesStatus;
-  });
+      return matchesSearch && matchesCategory && matchesTracking && matchesStatus;
+    });
+  }, [items, searchTerm, categoryFilter, trackingFilter, statusFilter]);
 
   const trackingColors = {
     INDIVIDUAL: 'bg-purple-100 text-purple-700',
@@ -106,8 +111,14 @@ const ItemsList = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="large" />
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-sm font-bold text-gray-900">Items Catalog</h1>
+            <p className="text-xs text-gray-600 mt-0.5">Loading items...</p>
+          </div>
+        </div>
+        <SkeletonList count={10} />
       </div>
     );
   }
@@ -120,13 +131,24 @@ const ItemsList = () => {
           <h1 className="text-sm font-bold text-gray-900">Items</h1>
           <p className="text-xs text-gray-600 mt-0.5">Manage inventory items and categories</p>
         </div>
-        <Link
-          to="/dashboard/items/new"
-          className="flex items-center gap-0.5 px-2 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          New Item
-        </Link>
+        {canCreate ? (
+          <Link
+            to="/dashboard/items/new"
+            className="flex items-center gap-0.5 px-2 py-1 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Item
+          </Link>
+        ) : (
+          <button
+            onClick={() => alert(getCannotCreateMessage(currentUser))}
+            className="flex items-center gap-0.5 px-2 py-1 bg-gray-300 text-gray-600 text-xs rounded-lg cursor-not-allowed"
+            title={getCannotCreateMessage(currentUser)}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Item
+          </button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -179,6 +201,19 @@ const ItemsList = () => {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-2 py-1.5 rounded-lg text-xs">
           {error}
+        </div>
+      )}
+
+      {/* Permission Warning */}
+      {!canCreate && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-xs font-medium text-yellow-900">Limited Access</p>
+            <p className="text-xs text-yellow-700 mt-0.5">
+              {getCannotCreateMessage(currentUser)}
+            </p>
+          </div>
         </div>
       )}
 
@@ -347,20 +382,27 @@ const ItemsList = () => {
                       </td>
                       <td className="px-2 py-1 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Link
-                            to={`/dashboard/items/${item.id}`}
-                            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Edit"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(item)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {canCreate && (
+                            <Link
+                              to={`/dashboard/items/${item.id}`}
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </Link>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDelete(item)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {!canCreate && !canDelete && (
+                            <span className="text-xs text-gray-400 px-2">Read-only</span>
+                          )}
                         </div>
                       </td>
                     </tr>
