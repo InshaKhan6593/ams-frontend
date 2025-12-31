@@ -2,15 +2,33 @@
 import apiClient from './client';
 
 export const locationsAPI = {
-  // Get all locations (with alias for consistency)
+  // Get all locations (with alias for consistency) - fetches all pages
   getLocations: async (params = {}) => {
-    const response = await apiClient.get('/locations/', { params });
-    return response.data;
+    let allLocations = [];
+    let currentPage = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await apiClient.get('/locations/', {
+        params: { ...params, page: currentPage }
+      });
+      const data = response.data;
+
+      if (Array.isArray(data)) {
+        allLocations = data;
+        hasMore = false;
+      } else {
+        allLocations = [...allLocations, ...(data.results || [])];
+        hasMore = !!data.next;
+        currentPage++;
+      }
+    }
+
+    return allLocations;
   },
-  
+
   getAll: async (params = {}) => {
-    const response = await apiClient.get('/locations/', { params });
-    return response.data;
+    return locationsAPI.getLocations(params);
   },
 
   // Get single location (with alias for consistency)

@@ -70,7 +70,9 @@ const MaintenanceForm = () => {
       setLoadingInstances(true);
       // Fetch all item instances (fixed assets only)
       const response = await apiClient.get('/item-instances/');
-      setInstances(response.data);
+      // Handle both paginated and non-paginated responses
+      const instancesData = Array.isArray(response.data) ? response.data : (response.data.results || []);
+      setInstances(instancesData);
     } catch (err) {
       console.error('Error fetching instances:', err);
     } finally {

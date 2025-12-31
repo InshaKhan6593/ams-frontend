@@ -7,7 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:create-categories": "playwright test create_categories.spec.js",
+    "test:create-locations": "playwright test create_locations.spec.js",
+    "test:inspection-workflow": "playwright test inspection_workflow_api.spec.js",
+    "test:report": "playwright show-report"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.16",
@@ -19,6 +26,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.57.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",

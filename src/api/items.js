@@ -42,9 +42,30 @@ export const itemsAPI = {
 export const categoriesAPI = {
   // Get all categories (supports hierarchical filtering)
   getAll: async (params = {}) => {
-    const response = await apiClient.get('/categories/', { params });
-    // Handle paginated response
-    return Array.isArray(response.data) ? response.data : (response.data.results || []);
+    let allCategories = [];
+    let currentPage = 1;
+    let hasMore = true;
+
+    // Fetch all pages
+    while (hasMore) {
+      const response = await apiClient.get('/categories/', {
+        params: { ...params, page: currentPage }
+      });
+      const data = response.data;
+
+      if (Array.isArray(data)) {
+        // Non-paginated response
+        allCategories = data;
+        hasMore = false;
+      } else {
+        // Paginated response
+        allCategories = [...allCategories, ...(data.results || [])];
+        hasMore = !!data.next;
+        currentPage++;
+      }
+    }
+
+    return allCategories;
   },
 
   // Get single category

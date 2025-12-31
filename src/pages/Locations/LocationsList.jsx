@@ -1,5 +1,5 @@
 // src/pages/Locations/LocationsList.jsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, MapPin, Building2, Store, Filter, Edit } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -19,6 +19,10 @@ const LocationsList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(25);
 
   // Debounce search to reduce API calls
   const debouncedSearch = useDebounce(searchTerm, 500);
@@ -53,6 +57,17 @@ const LocationsList = () => {
       return matchesSearch && matchesType && matchesStatus;
     });
   }, [locations, searchTerm, typeFilter, statusFilter]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredLocations.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentLocations = filteredLocations.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, statusFilter]);
 
   const typeColors = {
     DEPARTMENT: 'bg-blue-100 text-blue-700',
@@ -243,14 +258,14 @@ const LocationsList = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredLocations.length === 0 ? (
+              {currentLocations.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="px-2 py-6 text-center text-xs text-gray-500">
                     No locations found
                   </td>
                 </tr>
               ) : (
-                filteredLocations.map((location) => (
+                currentLocations.map((location) => (
                   <tr key={location.id} className="hover:bg-gray-50">
                     <td className="px-2 py-1">
                       <div className="flex items-center gap-1.5">
@@ -331,6 +346,74 @@ const LocationsList = () => {
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      {filteredLocations.length > itemsPerPage && (
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-600">
+              Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredLocations.length)} of {filteredLocations.length} locations
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
+                }`}
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          currentPage === page
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (page === currentPage - 2 || page === currentPage + 2) {
+                    return <span key={page} className="text-gray-400 px-1">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
+                }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer Summary */}
+      {filteredLocations.length > 0 && filteredLocations.length <= itemsPerPage && (
+        <div className="flex items-center justify-between text-xs text-gray-600 px-2">
+          <span>Showing all {filteredLocations.length} of {locations.length} locations</span>
+        </div>
+      )}
     </div>
   );
 };

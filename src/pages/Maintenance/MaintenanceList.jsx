@@ -1,7 +1,7 @@
 // src/pages/Maintenance/MaintenanceList.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Calendar, Wrench, Eye, Edit, Trash2, Search, Filter } from 'lucide-react';
+import { Plus, Calendar, Wrench, Eye, Edit, Trash2, Search, Filter, FileText } from 'lucide-react';
 import { maintenanceAPI } from '../../api/maintenance';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -25,7 +25,9 @@ const MaintenanceList = () => {
     try {
       setLoading(true);
       const data = await maintenanceAPI.getAll();
-      setMaintenanceRecords(data);
+      // Handle both paginated and non-paginated responses
+      const records = Array.isArray(data) ? data : (data.results || []);
+      setMaintenanceRecords(records);
       setError('');
     } catch (err) {
       console.error('Error fetching maintenance records:', err);
@@ -236,6 +238,16 @@ const MaintenanceList = () => {
                         title="View"
                       >
                         <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/dashboard/maintenance/${record.id}/paper`);
+                        }}
+                        className="text-green-600 hover:text-green-900 mr-2"
+                        title="View Maintenance Paper"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={(e) => {

@@ -22,7 +22,7 @@ import { StockEntriesList, StockEntryForm, StockEntryDetails } from './pages/Sto
 import { AcknowledgmentsList, AcknowledgmentForm } from './pages/Acknowledgments';
 import { ReturnAcknowledgmentsList, ReturnAcknowledgmentForm } from './pages/Returns';
 import { RequestsList, RequestForm, RequestDetails } from './pages/InterStoreRequests';
-import { MaintenanceList, MaintenanceForm } from './pages/Maintenance';
+import { MaintenanceList, MaintenanceForm, MaintenancePaper } from './pages/Maintenance';
 import QRScanner from './pages/QRScanner/QRScanner';
 
 // Protected Route Component
@@ -117,6 +117,7 @@ function AppRoutes() {
         <Route path="maintenance/new" element={<MaintenanceForm />} />
         <Route path="maintenance/:id" element={<MaintenanceForm />} />
         <Route path="maintenance/:id/edit" element={<MaintenanceForm />} />
+        <Route path="maintenance/:id/paper" element={<MaintenancePaper />} />
 
         {/* Locations */}
         <Route path="locations" element={<LocationsList />} />

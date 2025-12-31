@@ -17,6 +17,8 @@ const CategoriesList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [trackingFilter, setTrackingFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(25);
 
   useEffect(() => {
     fetchCategories();
@@ -26,7 +28,7 @@ const CategoriesList = () => {
     try {
       setLoading(true);
       const data = await categoriesAPI.getAll();
-      setCategories(Array.isArray(data) ? data : data.results || []);
+      setCategories(data); // getAll() now returns all categories across all pages
       setError('');
     } catch (err) {
       setError('Failed to load categories');
@@ -67,6 +69,17 @@ const CategoriesList = () => {
 
     return matchesSearch && matchesTracking && matchesStatus;
   });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredCategories.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentCategories = filteredCategories.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, trackingFilter, statusFilter]);
 
   const trackingColors = {
     INDIVIDUAL: 'bg-purple-100 text-purple-700',
@@ -280,14 +293,14 @@ const CategoriesList = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredCategories.length === 0 ? (
+              {currentCategories.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="px-2 py-6 text-center text-xs text-gray-500">
                     No categories found
                   </td>
                 </tr>
               ) : (
-                filteredCategories.map((category) => {
+                currentCategories.map((category) => {
                   const TrackingIcon = trackingIcons[category.tracking_type] || Tag;
                   const isBroaderCategory = !category.parent_category;
                   const categoryTypeDisplay = {
@@ -403,10 +416,72 @@ const CategoriesList = () => {
         </div>
       </div>
 
+      {/* Pagination Controls */}
+      {filteredCategories.length > itemsPerPage && (
+        <div className="bg-white rounded-lg border border-gray-200 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-600">
+              Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredCategories.length)} of {filteredCategories.length} categories
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
+                }`}
+              >
+                Previous
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                  // Show first page, last page, current page, and pages around current
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                          currentPage === page
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (page === currentPage - 2 || page === currentPage + 2) {
+                    return <span key={page} className="text-gray-400 px-1">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
+                }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer Summary */}
-      {filteredCategories.length > 0 && (
+      {filteredCategories.length > 0 && filteredCategories.length <= itemsPerPage && (
         <div className="flex items-center justify-between text-xs text-gray-600 px-2">
-          <span>Showing {filteredCategories.length} of {categories.length} categories</span>
+          <span>Showing all {filteredCategories.length} of {categories.length} categories</span>
         </div>
       )}
     </div>
