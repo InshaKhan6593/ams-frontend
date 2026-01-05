@@ -480,7 +480,7 @@ const InspectionStage1Form = ({
                   {/* Validation message */}
                   {(parseInt(item.accepted_quantity || 0) + parseInt(item.rejected_quantity || 0)) > parseInt(item.tendered_quantity || 0) && (
                     <div className="text-xs text-red-600 bg-red-50 p-1.5 rounded border border-red-200">
-                      âš  Warning: Accepted + Rejected ({parseInt(item.accepted_quantity || 0) + parseInt(item.rejected_quantity || 0)}) 
+                      ⚠ Warning: Accepted + Rejected ({parseInt(item.accepted_quantity || 0) + parseInt(item.rejected_quantity || 0)}) 
                       exceeds Tendered ({item.tendered_quantity || 0})
                     </div>
                   )}

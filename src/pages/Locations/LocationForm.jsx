@@ -2,14 +2,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, MapPin, Building2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { locationsAPI } from '../../api/locations';
 import { useAuth } from '../../hooks/useAuth';
+import { locationsKeys } from '../../hooks/queries/useLocations';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const LocationForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user: currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const isEditMode = Boolean(id);
 
   const [loading, setLoading] = useState(false);
@@ -174,6 +177,9 @@ const LocationForm = () => {
         await locationsAPI.createLocation(submitData);
         setSuccess('Location created successfully!');
       }
+
+      // Invalidate and refetch locations data
+      await queryClient.invalidateQueries({ queryKey: locationsKeys.all });
 
       setTimeout(() => navigate('/dashboard/locations'), 1500);
     } catch (err) {

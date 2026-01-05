@@ -783,8 +783,8 @@ const QRScanner = () => {
                         </div>
                       )}
                       
-                      {/* Remarks - Only show if not empty and not garbage */}
-                      {movement.remarks && movement.remarks.trim() && !movement.remarks.includes('Ã') && (
+                      {/* Remarks - Only show if not empty */}
+                      {movement.remarks && movement.remarks.trim() && (
                         <div className="mt-0.5 bg-yellow-50 border border-yellow-200 rounded px-1.5 py-0.5">
                           <p className="text-gray-700 text-[9px]">{movement.remarks}</p>
                         </div>

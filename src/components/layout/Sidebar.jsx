@@ -110,19 +110,19 @@ const Sidebar = () => {
       name: 'Categories',
       icon: FolderTree,
       path: '/dashboard/categories',
-      alwaysShow: true, // Categories visible to all
+      requiredPermissions: [PERMISSIONS.ITEMS.VIEW],
     },
     {
       name: 'Items',
       icon: BoxIcon,
       path: '/dashboard/items',
-      alwaysShow: true, // Items visible to all
+      requiredPermissions: [PERMISSIONS.ITEMS.VIEW],
     },
     {
       name: 'Inventory',
       icon: BarChart3,
       path: '/dashboard/inventory',
-      alwaysShow: true, // Inventory visible to all
+      requiredPermissions: [PERMISSIONS.STOCK.VIEW_INVENTORY],
     },
     {
       name: 'QR Scanner',

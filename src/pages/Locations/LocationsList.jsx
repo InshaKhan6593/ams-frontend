@@ -35,8 +35,11 @@ const LocationsList = () => {
     return params;
   }, [debouncedSearch, typeFilter]);
 
-  // Fetch locations with React Query (automatic caching)
-  const { data: locations = [], isLoading: loading, error, refetch } = useLocations(queryParams);
+  // Fetch locations with React Query (automatic caching & refetch on mount)
+  const { data: locations = [], isLoading: loading, error, refetch } = useLocations(queryParams, {
+    refetchOnMount: 'always', // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+  });
 
   // Filter locations (client-side)
   const filteredLocations = useMemo(() => {

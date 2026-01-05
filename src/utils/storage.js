@@ -27,7 +27,15 @@ export const storage = {
 
   getUser: () => {
     const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    if (!user || user === 'undefined' || user === 'null') {
+      return null;
+    }
+    try {
+      return JSON.parse(user);
+    } catch (error) {
+      console.error('Error parsing user data from localStorage:', error);
+      return null;
+    }
   },
 
   clearUser: () => {
@@ -41,7 +49,15 @@ export const storage = {
 
   getPermissions: () => {
     const permissions = localStorage.getItem('permissions');
-    return permissions ? JSON.parse(permissions) : null;
+    if (!permissions || permissions === 'undefined' || permissions === 'null') {
+      return null;
+    }
+    try {
+      return JSON.parse(permissions);
+    } catch (error) {
+      console.error('Error parsing permissions data from localStorage:', error);
+      return null;
+    }
   },
 
   clearPermissions: () => {

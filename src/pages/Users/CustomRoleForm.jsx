@@ -8,7 +8,6 @@ import { locationsAPI } from '../../api/locations';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import { PERMISSION_CATEGORIES, PERMISSION_LABELS } from '../../constants/permissions';
-import { usersAPI } from '../../api/users';
 
 const CustomRoleForm = () => {
   const navigate = useNavigate();
@@ -25,15 +24,14 @@ const CustomRoleForm = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    location: '',
-    requires_base_role: '',
+    location: null,  // null = global, id = location-specific
     is_active: true,
     // Initialize all permissions to false
     ...Object.keys(PERMISSION_LABELS).reduce((acc, key) => ({ ...acc, [key]: false }), {}),
   });
 
-  // Locations for dropdown
-  const [locations, setLocations] = useState([]);
+  // Available locations for location-specific roles
+  const [availableLocations, setAvailableLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
 
   // Collapsible category state
@@ -48,24 +46,21 @@ const CustomRoleForm = () => {
     reports: false,
   });
 
-  // Base role options
-  const roles = usersAPI.getRoles();
-
   useEffect(() => {
-    fetchStandaloneLocations();
+    fetchAvailableLocations();
     if (isEditMode) {
       fetchCustomRole();
     }
   }, [id]);
 
-  const fetchStandaloneLocations = async () => {
+  const fetchAvailableLocations = async () => {
     try {
       setLoadingLocations(true);
       const response = await locationsAPI.getLocations({ is_standalone: true });
-      setLocations(Array.isArray(response) ? response : response.results || []);
+      setAvailableLocations(Array.isArray(response) ? response : response.results || []);
     } catch (err) {
       console.error('Error fetching locations:', err);
-      setError('Failed to load locations');
+      setAvailableLocations([]);
     } finally {
       setLoadingLocations(false);
     }
@@ -78,8 +73,7 @@ const CustomRoleForm = () => {
       setFormData({
         name: data.name || '',
         description: data.description || '',
-        location: data.location || '',
-        requires_base_role: data.requires_base_role || '',
+        location: data.location || null,
         is_active: data.is_active !== undefined ? data.is_active : true,
         // Set all permission fields from response
         ...Object.keys(PERMISSION_LABELS).reduce((acc, key) => ({
@@ -100,7 +94,7 @@ const CustomRoleForm = () => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? checked : (name === 'location' && value === '' ? null : value),
     }));
   };
 
@@ -138,11 +132,6 @@ const CustomRoleForm = () => {
       return false;
     }
 
-    if (!formData.location) {
-      setError('Location is required');
-      return false;
-    }
-
     // Check if at least one permission is selected
     const hasAnyPermission = Object.keys(PERMISSION_LABELS).some((key) => formData[key]);
     if (!hasAnyPermission) {
@@ -174,7 +163,7 @@ const CustomRoleForm = () => {
       }
 
       setTimeout(() => {
-        navigate('/dashboard/users');
+        navigate('/dashboard/users/custom-roles');
       }, 1500);
     } catch (err) {
       setError(err.response?.data?.detail || err.response?.data?.message || 'Operation failed');
@@ -267,7 +256,7 @@ const CustomRoleForm = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/dashboard/users')}
+            onClick={() => navigate('/dashboard/users/custom-roles')}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-4 h-4 text-gray-600" />
@@ -277,7 +266,7 @@ const CustomRoleForm = () => {
               {isEditMode ? 'Edit Custom Role' : 'Create Custom Role'}
             </h1>
             <p className="text-xs text-gray-600 mt-0.5">
-              {isEditMode ? 'Update role permissions and details' : 'Define a new custom role with specific permissions'}
+              {isEditMode ? 'Update role permissions and details' : 'Define a new custom role (global or location-specific) with specific permissions'}
             </p>
           </div>
         </div>
@@ -313,53 +302,8 @@ const CustomRoleForm = () => {
                 onChange={handleChange}
                 required
                 className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="e.g., Inventory Manager"
+                placeholder="e.g., Inventory Viewer, Report Generator"
               />
-            </div>
-
-            {/* Location */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Location <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                required
-                disabled={loadingLocations}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="">Select location</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name} ({loc.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Base Role Requirement */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Base Role Requirement (Optional)
-              </label>
-              <select
-                name="requires_base_role"
-                value={formData.requires_base_role}
-                onChange={handleChange}
-                className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="">Any role</option>
-                {roles.map((role) => (
-                  <option key={role.value} value={role.value}>
-                    {role.label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Only users with this base role can be assigned this custom role
-              </p>
             </div>
 
             {/* Status */}
@@ -392,13 +336,38 @@ const CustomRoleForm = () => {
               placeholder="Describe the purpose and scope of this role..."
             />
           </div>
+
+          {/* Location Selector (Global vs Location-specific) */}
+          <div className="mt-2.5">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Role Scope <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="location"
+              value={formData.location || ''}
+              onChange={handleChange}
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Global (University-wide)</option>
+              {availableLocations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} (Location-specific)
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              {formData.location
+                ? '📍 This role will only be available for users in the selected location'
+                : '🌐 This role will be available university-wide for all users'}
+            </p>
+          </div>
         </div>
 
         {/* Permissions Section */}
         <div className="bg-white rounded-lg border border-gray-200 p-2.5">
           <h2 className="text-base font-semibold text-gray-900 mb-1">Permissions</h2>
           <p className="text-xs text-gray-600 mb-2.5">
-            Select the permissions for this custom role. Users with this role will inherit these permissions.
+            Select the permissions for this custom role. Users assigned this role will inherit these permissions.
           </p>
 
           <div className="space-y-2">
@@ -430,7 +399,7 @@ const CustomRoleForm = () => {
 
           <button
             type="button"
-            onClick={() => navigate('/dashboard/users')}
+            onClick={() => navigate('/dashboard/users/custom-roles')}
             className="px-2.5 py-1.5 border border-gray-300 text-gray-700 text-xs rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel

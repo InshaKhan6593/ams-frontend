@@ -1,6 +1,7 @@
 // src/pages/Inspections/InspectionForm.jsx - FIXED
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, Send, CheckCircle, XCircle } from 'lucide-react';
 import { inspectionsAPI } from '../../api/inspections';
 import { locationsAPI } from '../../api/locations';
@@ -11,11 +12,13 @@ import InspectionStage1Form from './InspectionStage1Form';
 import InspectionStage2Form from './InspectionStage2Form';
 import InspectionStage3Form from './InspectionStage3Form';
 import InspectionStage4Form from './InspectionStage4Form';
+import { inspectionsKeys } from '../../hooks/queries/useInspections';
 
 const InspectionForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user: currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const isEditMode = Boolean(id);
 
   const [loading, setLoading] = useState(false);
@@ -99,18 +102,58 @@ const InspectionForm = () => {
     }));
   }, []);
 
+  // Validate required fields for Stage 1 (INITIATED)
+  const validateRequiredFields = (data) => {
+    const requiredFields = [
+      { field: 'date', label: 'Certificate Date' },
+      { field: 'department', label: 'Department' },
+      { field: 'contract_no', label: 'Contract No' },
+      { field: 'contractor_name', label: 'Contractor Name' },
+      { field: 'consignee_name', label: 'Consignee Name' },
+      { field: 'consignee_designation', label: 'Consignee Designation' },
+      { field: 'indenter', label: 'Indenter' },
+      { field: 'indent_no', label: 'Indent No' },
+    ];
+
+    const missingFields = requiredFields.filter(({ field }) => {
+      const value = data[field];
+      return !value || (typeof value === 'string' && value.trim() === '');
+    });
+
+    if (missingFields.length > 0) {
+      const fieldLabels = missingFields.map(f => f.label).join(', ');
+      throw new Error(`Please fill in all required fields: ${fieldLabels}`);
+    }
+
+    // Validate at least one inspection item
+    if (!data.inspection_items || data.inspection_items.length === 0) {
+      throw new Error('Please add at least one inspection item');
+    }
+
+    return true;
+  };
+
   const handleSave = async (formData) => {
     try {
       setSaving(true);
       setError('');
-      
+
       if (isEditMode) {
         const updated = await inspectionsAPI.patch(id, formData);
         setInspection(updated);
         setSuccess('Inspection certificate saved successfully!');
+
+        // Invalidate queries to ensure lists are updated
+        queryClient.invalidateQueries({ queryKey: inspectionsKeys.detail(id) });
+        queryClient.invalidateQueries({ queryKey: inspectionsKeys.lists() });
       } else {
         const created = await inspectionsAPI.create(formData);
         setSuccess('Inspection certificate created successfully!');
+
+        // Invalidate queries for new inspection
+        queryClient.invalidateQueries({ queryKey: inspectionsKeys.lists() });
+        queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+
         setTimeout(() => navigate(`/dashboard/inspections/${created.id}`), 1500);
       }
     } catch (err) {
@@ -128,6 +171,19 @@ const InspectionForm = () => {
     try {
       setSubmitting(true);
       setError('');
+
+      // Validate required fields for INITIATED stage (new certificates)
+      if (!isEditMode || inspection.stage === 'INITIATED') {
+        try {
+          validateRequiredFields(inspection);
+        } catch (validationError) {
+          setError(validationError.message);
+          setSubmitting(false);
+          // Scroll to top to show error message
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      }
 
       let inspectionId = id;
       let createdInspection = null;
@@ -244,11 +300,15 @@ const InspectionForm = () => {
 
       setSuccess(result.message || 'Certificate submitted successfully!');
 
+      // Invalidate all inspection queries to ensure fresh data everywhere
+      queryClient.invalidateQueries({ queryKey: inspectionsKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['pendingTasks'] });
+
       // Navigate to the inspection detail page (or reload if already there)
       setTimeout(() => {
         if (isEditMode) {
-          // Already on the page, just fetch fresh data
-          window.location.reload();
+          // Already on the page, refetch fresh data
+          fetchInspection();
         } else {
           // Navigate to the newly created inspection
           navigate(`/dashboard/inspections/${inspectionId}`, { replace: true });
@@ -296,14 +356,30 @@ const InspectionForm = () => {
     try {
       setSubmitting(true);
       setError('');
-      
+
       const result = await inspectionsAPI.rejectCertificate(id, rejectionReason);
-      setSuccess('Certificate rejected successfully');
+
+      // Build success message with cleanup details
+      let successMessage = result.message || 'Certificate rejected successfully';
+
+      if (result.deleted_items && result.deleted_items.length > 0) {
+        successMessage += '\n\nDeleted items:\n' + result.deleted_items.map(item => `• ${item}`).join('\n');
+      }
+
+      if (result.deleted_categories && result.deleted_categories.length > 0) {
+        successMessage += '\n\nDeleted categories:\n' + result.deleted_categories.map(cat => `• ${cat}`).join('\n');
+      }
+
+      if (result.cleanup_warnings && result.cleanup_warnings.length > 0) {
+        successMessage += '\n\nWarnings:\n' + result.cleanup_warnings.map(warning => `⚠ ${warning}`).join('\n');
+      }
+
+      setSuccess(successMessage);
       setShowRejectModal(false);
-      
+
       setTimeout(() => {
         fetchInspection();
-      }, 1000);
+      }, 2000);
     } catch (err) {
       console.error('Error rejecting certificate:', err);
       const errorMessage = err.response?.data?.error ||
@@ -342,7 +418,7 @@ const InspectionForm = () => {
   const isRejected = currentStage === 'REJECTED';
   const isCompleted = currentStage === 'COMPLETED';
   
-  // Ã¢Å“â€¦ FIX: Override isReadOnly for STOCK_DETAILS stage
+  // FIX: Override isReadOnly for STOCK_DETAILS stage
   // Force editable for Stock Incharge in STOCK_DETAILS stage
   const isStockIncharge = currentUser?.profile?.role === 'STOCK_INCHARGE';
   const isStockDetailsStage = currentStage === 'STOCK_DETAILS';
@@ -382,12 +458,12 @@ const InspectionForm = () => {
           <div className="flex items-center gap-2">
             {isCompleted && (
               <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                Ã¢Å“â€œ Completed
+                ✓ Completed
               </span>
             )}
             {isRejected && (
               <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded">
-                Ã¢Å“â€” Rejected
+                ✗ Rejected
               </span>
             )}
           </div>
@@ -396,14 +472,14 @@ const InspectionForm = () => {
 
       {/* Messages */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-2 py-1.5 rounded-lg text-xs">
-          {error}
+        <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs whitespace-pre-line">
+          <strong className="font-semibold">Error:</strong> {error}
         </div>
       )}
 
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-2 py-1.5 rounded-lg text-xs">
-          {success}
+        <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-xs whitespace-pre-line">
+          <strong className="font-semibold">Success:</strong> {success}
         </div>
       )}
 

@@ -194,19 +194,19 @@ const InspectionsList = () => {
             {searchTerm && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
                 Search: {searchTerm}
-                <button onClick={() => setSearchTerm('')} className="hover:text-blue-900">Ã—</button>
+                <button onClick={() => setSearchTerm('')} className="hover:text-blue-900">×</button>
               </span>
             )}
             {stageFilter && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">
                 Stage: {stageFilter}
-                <button onClick={() => setStageFilter('')} className="hover:text-purple-900">Ã—</button>
+                <button onClick={() => setStageFilter('')} className="hover:text-purple-900">×</button>
               </span>
             )}
             {statusFilter && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
                 Status: {statusFilter}
-                <button onClick={() => setStatusFilter('')} className="hover:text-green-900">Ã—</button>
+                <button onClick={() => setStatusFilter('')} className="hover:text-green-900">×</button>
               </span>
             )}
           </div>

@@ -73,7 +73,8 @@ export const usePermissions = () => {
 
   /**
    * Check if user can manage custom roles
-   * Only System Admin and Location Head can create/manage custom roles
+   * System Admin can create/manage global custom roles
+   * Location Head can assign global custom roles to users in their locations
    * @returns {boolean}
    */
   const canManageCustomRoles = () => {

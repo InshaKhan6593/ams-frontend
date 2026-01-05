@@ -26,7 +26,9 @@ export function useInspections(params = {}, options = {}) {
       // Handle both array and paginated response formats
       return Array.isArray(data) ? data : (data.results || []);
     },
-    staleTime: 3 * 60 * 1000, // Cache for 3 minutes (inspections change frequently)
+    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh longer
+    refetchOnWindowFocus: false, // Disable refetch on focus to prevent flickering
+    refetchInterval: false, // Disable auto-refetch to prevent unexpected updates
     ...options,
   });
 }
@@ -41,7 +43,8 @@ export function useInspection(id, options = {}) {
     queryKey: inspectionsKeys.detail(id),
     queryFn: () => inspectionsAPI.get(id),
     enabled: !!id,
-    staleTime: 2 * 60 * 1000, // Shorter cache as inspections are actively edited
+    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh longer
+    refetchOnWindowFocus: false, // Disable refetch on focus to prevent flickering
     ...options,
   });
 }

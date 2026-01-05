@@ -1,5 +1,6 @@
 // src/context/AuthContext.jsx
 import { createContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authAPI } from '../api/auth';
 import { usersAPI } from '../api/users';
 import { storage } from '../utils/storage';
@@ -7,6 +8,7 @@ import { storage } from '../utils/storage';
 export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const [permissions, setPermissions] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,7 +36,19 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = async (username, password) => {
     try {
+      // Clear all cached queries before login to prevent data from previous user
+      queryClient.clear();
+
       const data = await authAPI.login(username, password);
+
+      // Check if user data is present in the response
+      if (!data.user) {
+        console.error('Login response missing user data:', data);
+        return {
+          success: false,
+          error: 'Login failed. Server did not return user data. Please try again or contact support.',
+        };
+      }
 
       // Store tokens
       storage.setTokens(data.access, data.refresh);
@@ -43,7 +57,7 @@ export const AuthProvider = ({ children }) => {
       storage.setUser(data.user);
 
       // Store permissions (backend includes permissions in user object)
-      if (data.user.permissions) {
+      if (data.user && data.user.permissions) {
         storage.setPermissions(data.user.permissions);
         setPermissions(data.user.permissions);
       }
@@ -57,13 +71,16 @@ export const AuthProvider = ({ children }) => {
       console.error('Login error:', error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Login failed. Please check your credentials.',
+        error: error.response?.data?.detail || error.response?.data?.error || 'Login failed. Please check your credentials.',
       };
     }
   };
 
   // Logout function
   const logout = () => {
+    // Clear all cached queries to prevent data leakage between users
+    queryClient.clear();
+
     storage.clearAll();
     setUser(null);
     setPermissions(null);
