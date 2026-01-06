@@ -14,17 +14,13 @@ const InspectionsList = () => {
   const [stageFilter, setStageFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  // Debounce search to reduce API calls
-  const debouncedSearch = useDebounce(searchTerm, 500);
-
-  // Build query params
+  // Build query params (only use stage/status filters, not search)
   const queryParams = useMemo(() => {
     const params = {};
-    if (debouncedSearch) params.search = debouncedSearch;
     if (stageFilter) params.stage = stageFilter;
     if (statusFilter) params.status = statusFilter;
     return params;
-  }, [debouncedSearch, stageFilter, statusFilter]);
+  }, [stageFilter, statusFilter]);
 
   // Fetch inspections with React Query (automatic caching)
   const { data: inspections = [], isLoading: loading, error, refetch } = useInspections(queryParams);
@@ -247,7 +243,7 @@ const InspectionsList = () => {
                             {inspection.certificate_no}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {new Date(inspection.date).toLocaleDateString()}
+                            {new Date(inspection.created_at).toLocaleDateString()}
                           </p>
                         </div>
                       </div>

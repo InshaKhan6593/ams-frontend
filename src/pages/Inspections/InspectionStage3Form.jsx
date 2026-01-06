@@ -14,7 +14,6 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showCreateSubCategoryModal, setShowCreateSubCategoryModal] = useState(false);
   const [showItemDetails, setShowItemDetails] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -246,21 +245,6 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || err.response?.data?.detail || 'Failed to create item');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateSubCategory = async (subCategoryData) => {
-    try {
-      setLoading(true);
-      const response = await inspectionsAPI.createSubCategory(inspection.id, subCategoryData);
-      setSuccess(`Sub-category "${response.name}" created successfully!`);
-      setShowCreateSubCategoryModal(false);
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.detail || 'Failed to create sub-category');
       console.error(err);
     } finally {
       setLoading(false);
@@ -553,20 +537,10 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
       {/* Unlinked Items - Interactive Linking */}
       {unlinkedItems.length > 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg p-2">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-semibold text-gray-900 flex items-center gap-1">
-              <AlertCircle className="w-4 h-4 text-amber-600" />
-              Items Requiring Linking ({unlinkedItems.length})
-            </h4>
-            <button
-              onClick={() => setShowCreateSubCategoryModal(true)}
-              disabled={!canEdit}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
-            >
-              <FolderPlus className="w-3 h-3" />
-              Create Sub-Category
-            </button>
-          </div>
+          <h4 className="text-xs font-semibold text-gray-900 flex items-center gap-1 mb-2">
+            <AlertCircle className="w-4 h-4 text-amber-600" />
+            Items Requiring Linking ({unlinkedItems.length})
+          </h4>
 
           <div className="space-y-1">
             {unlinkedItems.map((item) => (
@@ -936,16 +910,6 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
         />
       )}
 
-      {/* Create Sub-Category Modal */}
-      {showCreateSubCategoryModal && (
-        <CreateSubCategoryModal
-          onClose={() => setShowCreateSubCategoryModal(false)}
-          onCreate={handleCreateSubCategory}
-          loading={loading}
-          contextMessage={unlinkedItems.length > 0 ? `Creating sub-category for linking inspection items. ${unlinkedItems.length} item(s) need linking.` : null}
-        />
-      )}
-
       {/* Item Details Modal */}
       {showItemDetails && (
         <ItemDetailsModal
@@ -959,6 +923,9 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
 
 // Create Item Modal Component
 const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loading }) => {
+  const [showCreateSubCategoryModal, setShowCreateSubCategoryModal] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: inspectionItem.item_description || inspectionItem.description || '',
     category: '',
@@ -982,33 +949,25 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
   const [loadingData, setLoadingData] = useState(false);
   const [selectedCategoryTrackingType, setSelectedCategoryTrackingType] = useState(null);
 
-  useEffect(() => {
-    fetchAllCategories();
-  }, []);
-
   const fetchAllCategories = async () => {
     try {
       setLoadingData(true);
       const data = await categoriesAPI.getAll();
-      // Handle both array and paginated responses
       const categories = Array.isArray(data) ? data : data.results || [];
       const activeCategories = categories.filter(cat => cat.is_active);
 
       setAllCategories(activeCategories);
 
-      // Build hierarchical structure
       const broader = activeCategories.filter(cat => !cat.parent_category);
       const hierarchical = [];
 
       broader.forEach(broaderCat => {
-        // Add broader category
         hierarchical.push({
           ...broaderCat,
           level: 0,
           displayName: `${broaderCat.name} (${broaderCat.tracking_type})`
         });
 
-        // Add its sub-categories
         const subs = activeCategories.filter(cat => cat.parent_category === broaderCat.id);
         subs.forEach(subCat => {
           hierarchical.push({
@@ -1027,6 +986,22 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
     }
   };
 
+  const handleCreateSubCategory = async (subCategoryData) => {
+    try {
+      const response = await categoriesAPI.create(subCategoryData);
+      setSuccess(`Sub-category "${response.name}" created successfully!`);
+      setShowCreateSubCategoryModal(false);
+      await fetchAllCategories();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      const errorMessage = err.response?.data?.error || err.response?.data?.detail || err.message || 'Failed to create sub-category';
+      console.error('Error creating sub-category:', err.response?.data);
+      setError(errorMessage);
+    }
+  };
+  useEffect(() => {
+    fetchAllCategories();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -1082,6 +1057,29 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {success && (
+          <div className="mx-4 mt-4 bg-green-50 border border-green-200 rounded-lg p-2 flex items-start gap-1.5">
+            <Check className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs font-medium text-green-800">Success</p>
+              <p className="text-xs text-green-700">{success}</p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mx-4 mt-4 bg-red-50 border border-red-200 rounded-lg p-2 flex items-start gap-1.5">
+            <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs font-medium text-red-800">Error</p>
+              <p className="text-xs text-red-700">{error}</p>
+            </div>
+            <button onClick={() => setError('')} className="text-red-600 hover:text-red-700">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg p-3">
@@ -1147,35 +1145,45 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Category <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 max-h-48 overflow-y-auto"
-                style={{ maxHeight: '12rem' }}
-                required
-                disabled={loadingData}
-                size="1"
-              >
-                <option value="">Select category</option>
-                {hierarchicalCategories.map(cat => (
-                  <option
-                    key={cat.id}
-                    value={cat.id}
-                    className={cat.level === 0 ? 'font-semibold bg-gray-50' : 'font-normal'}
-                    style={{
-                      paddingLeft: cat.level === 0 ? '0.5rem' : '1.5rem',
-                      fontWeight: cat.level === 0 ? '600' : '400'
-                    }}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Category <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 max-h-48 overflow-y-auto"
+                    style={{ maxHeight: '12rem' }}
+                    required
+                    disabled={loadingData}
+                    size="1"
                   >
-                    {cat.displayName}
-                  </option>
-                ))}
-              </select>
+                    <option value="">Select category</option>
+                    {hierarchicalCategories.map(cat => (
+                      <option
+                        key={cat.id}
+                        value={cat.id}
+                        className={cat.level === 0 ? 'font-semibold bg-gray-50' : 'font-normal'}
+                        style={{
+                          paddingLeft: cat.level === 0 ? '0.5rem' : '1.5rem',
+                          fontWeight: cat.level === 0 ? '600' : '400'
+                        }}
+                      >
+                        {cat.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateSubCategoryModal(true)}
+                    className="flex-shrink-0 px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                    title="Create new sub-category"
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                  </button>
+                </div>
               {hierarchicalCategories.length === 0 && !loadingData && (
                 <p className="text-xs text-amber-600 mt-1">
                   No categories available. Create categories first.
@@ -1468,13 +1476,22 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
           </button>
         </div>
         </form>
+
+        {/* Create Sub-Category Modal */}
+        {showCreateSubCategoryModal && (
+          <CreateSubCategoryModal
+            onClose={() => setShowCreateSubCategoryModal(false)}
+            onCreate={handleCreateSubCategory}
+            loading={loading}
+          />
+        )}
       </div>
     </div>
   );
 };
 
 // Create Sub-Category Modal Component
-const CreateSubCategoryModal = ({ onClose, onCreate, loading, contextMessage }) => {
+const CreateSubCategoryModal = ({ onClose, onCreate, loading }) => {
   const [formData, setFormData] = useState({
     name: '',
     parent_category_id: '',
@@ -1494,9 +1511,7 @@ const CreateSubCategoryModal = ({ onClose, onCreate, loading, contextMessage }) 
     try {
       setLoadingData(true);
       const data = await categoriesAPI.getBroaderCategories();
-      // Handle both array and paginated responses
       const categories = Array.isArray(data) ? data : data.results || [];
-      // Filter only active broader categories (those without parent_category)
       const broaderOnly = categories.filter(cat => cat.is_active && !cat.parent_category);
       setBroaderCategories(broaderOnly);
     } catch (err) {
@@ -1520,11 +1535,10 @@ const CreateSubCategoryModal = ({ onClose, onCreate, loading, contextMessage }) 
     e.preventDefault();
     const payload = {
       name: formData.name,
-      parent_category_id: parseInt(formData.parent_category_id),
+      parent_category: parseInt(formData.parent_category_id),
       description: formData.description,
     };
 
-    // Only add depreciation for fixed assets (INDIVIDUAL tracking)
     if (selectedParent?.tracking_type === 'INDIVIDUAL' && formData.depreciation_rate) {
       payload.depreciation_rate = parseFloat(formData.depreciation_rate);
       payload.depreciation_method = formData.depreciation_method;
@@ -1544,14 +1558,6 @@ const CreateSubCategoryModal = ({ onClose, onCreate, loading, contextMessage }) 
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
-          {contextMessage && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-              <p className="text-xs text-blue-800">
-                <strong>ℹ️ Context:</strong> {contextMessage}
-              </p>
-            </div>
-          )}
-
           <div className="bg-amber-50 border border-amber-300 rounded-lg p-2">
             <p className="text-xs text-amber-800">
               <strong>💡 Note:</strong> Sub-categories help organize items under broader categories.

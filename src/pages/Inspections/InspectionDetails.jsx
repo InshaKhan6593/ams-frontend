@@ -186,7 +186,7 @@ const InspectionDetails = () => {
             <div>
               <p className="text-xs text-gray-600">Date</p>
               <p className="text-xs font-medium text-gray-900">
-                {new Date(inspection.date).toLocaleDateString()}
+                {inspection.date_of_inspection ? new Date(inspection.date_of_inspection).toLocaleDateString() : 'N/A'}
               </p>
             </div>
           </div>
