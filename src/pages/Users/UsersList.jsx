@@ -287,7 +287,7 @@ const UsersList = () => {
                     </td>
                     <td className="px-2.5 py-1.5">
                       <span className="text-xs text-gray-600">
-                        {user.assigned_locations_data?.length || 0} location(s)
+                        {user.assigned_locations_names?.length || 0} location(s)
                       </span>
                     </td>
                     <td className="px-2.5 py-1.5">
