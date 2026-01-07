@@ -26,7 +26,7 @@ const InspectionDetails = () => {
       setLoading(true);
       setError('');
       const data = await inspectionsAPI.get(id);
-      console.log('Inspection data loaded:', data); // Debug
+      console.log('Inspection data loaded:', data);
       setInspection(data);
     } catch (err) {
       console.error('Error loading inspection:', err);
@@ -45,8 +45,7 @@ const InspectionDetails = () => {
     try {
       setDownloading(true);
       const response = await inspectionsAPI.downloadPDF(id);
-      
-      // Create blob and download
+
       const blob = new Blob([response], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -194,6 +193,26 @@ const InspectionDetails = () => {
               </p>
             </div>
           </div>
+
+          <div className="flex items-start gap-2">
+            <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-600">Date of Inspection</p>
+              <p className="text-xs font-medium text-gray-900">
+                {inspection.date_of_inspection ? new Date(inspection.date_of_inspection).toLocaleDateString() : 'N/A'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2">
+            <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-600">Finance Check Date</p>
+              <p className="text-xs font-medium text-gray-900">
+                {inspection.finance_check_date ? new Date(inspection.finance_check_date).toLocaleDateString() : 'N/A'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -224,6 +243,14 @@ const InspectionDetails = () => {
         <h2 className="text-xs font-semibold text-gray-900 mb-2">Department & Delivery</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div className="flex items-start gap-2">
+            <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-600">Department</p>
+              <p className="text-xs font-medium text-gray-900">{inspection.department_name || 'N/A'}</p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2">
             <User className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-xs text-gray-600">Indenter</p>
@@ -236,14 +263,6 @@ const InspectionDetails = () => {
             <div>
               <p className="text-xs text-gray-600">Indent No</p>
               <p className="text-xs font-medium text-gray-900">{inspection.indent_no}</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs text-gray-600">Department</p>
-              <p className="text-xs font-medium text-gray-900">{inspection.department_name || 'N/A'}</p>
             </div>
           </div>
 
@@ -264,16 +283,6 @@ const InspectionDetails = () => {
               <p className="text-xs font-medium text-gray-900">{inspection.delivery_type || 'N/A'}</p>
             </div>
           </div>
-
-          <div className="flex items-start gap-2">
-            <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs text-gray-600">Date of Inspection</p>
-              <p className="text-xs font-medium text-gray-900">
-                {inspection.date_of_inspection ? new Date(inspection.date_of_inspection).toLocaleDateString() : 'N/A'}
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -289,10 +298,13 @@ const InspectionDetails = () => {
                 <tr className="bg-gray-50">
                   <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-700">#</th>
                   <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-700">Item</th>
+                  <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-700">Category</th>
                   <th className="px-2 py-1.5 text-left text-xs font-medium text-gray-700">Tracking</th>
                   <th className="px-2 py-1.5 text-center text-xs font-medium text-gray-700">Tendered</th>
                   <th className="px-2 py-1.5 text-center text-xs font-medium text-gray-700">Rejected</th>
                   <th className="px-2 py-1.5 text-center text-xs font-medium text-gray-700">Accepted</th>
+                  <th className="px-2 py-1.5 text-right text-xs font-medium text-gray-700">Unit Price</th>
+                  <th className="px-2 py-1.5 text-right text-xs font-medium text-gray-700">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -305,14 +317,29 @@ const InspectionDetails = () => {
                         <span className="block text-xs text-gray-600 mt-0.5">Batch: {item.batch_number}</span>
                       )}
                     </td>
+                    <td className="px-2 py-2 text-xs text-gray-600">{item.item_category_name || 'N/A'}</td>
                     <td className="px-2 py-2 text-xs text-gray-600">{item.item_tracking_type_display || 'N/A'}</td>
                     <td className="px-2 py-2 text-xs text-center text-gray-900">{item.tendered_quantity || 0}</td>
                     <td className="px-2 py-2 text-xs text-center text-red-600">{item.rejected_quantity || 0}</td>
                     <td className="px-2 py-2 text-xs text-center text-green-600">{item.accepted_quantity || 0}</td>
+                    <td className="px-2 py-2 text-xs text-right text-gray-900">
+                      {item.unit_price ? `Rs. ${parseFloat(item.unit_price).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+                    </td>
+                    <td className="px-2 py-2 text-xs text-right text-gray-900">
+                      {item.unit_price && item.accepted_quantity
+                        ? `Rs. ${(parseFloat(item.unit_price) * parseInt(item.accepted_quantity)).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : 'N/A'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="mt-2 pt-2 border-t border-gray-200 flex justify-between text-xs">
+            <span className="font-medium text-gray-900">Total Items: {inspection.inspection_items.length}</span>
+            <span className="font-medium text-gray-900">
+              Total Value: Rs. {inspection.total_value ? parseFloat(inspection.total_value).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+            </span>
           </div>
         </div>
       )}
@@ -336,6 +363,16 @@ const InspectionDetails = () => {
                 <div>
                   <p className="text-xs text-gray-600">Designation</p>
                   <p className="text-xs font-medium text-gray-900">{inspection.consignee_designation}</p>
+                </div>
+              </div>
+            )}
+
+            {inspection.inspected_by && (
+              <div className="flex items-start gap-2">
+                <User className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-gray-600">Inspected By</p>
+                  <p className="text-xs font-medium text-gray-900">{inspection.inspected_by}</p>
                 </div>
               </div>
             )}

@@ -5,16 +5,36 @@ import { Check, Clock, XCircle } from 'lucide-react';
 const InspectionWorkflowProgress = ({ inspection }) => {
   if (!inspection) return null;
 
+  // Use the new workflow_handlers data if available, otherwise fallback to workflow_stages
+  const handlers = inspection.workflow_handlers || [];
   const stages = inspection.workflow_stages || [];
   const currentStage = inspection.stage;
   const isRejected = currentStage === 'REJECTED';
   const isCompleted = currentStage === 'COMPLETED';
 
   // Find current stage index
-  const currentIndex = stages.findIndex(s => s.stage === currentStage);
+  // For rejected inspections, use rejection_stage to determine how far they got
+  let currentIndex;
+  if (isRejected && inspection.rejection_stage) {
+    currentIndex = stages.findIndex(s => s.stage === inspection.rejection_stage);
+  } else {
+    currentIndex = stages.findIndex(s => s.stage === currentStage);
+  }
 
-  // Get handler info for a specific stage
+  // Get handler info for a specific stage - now uses workflow_handlers array
   const getStageHandlerInfo = (stage) => {
+    // Find handler from the new workflow_handlers array
+    const handler = handlers.find(h => h.stage === stage);
+    if (handler) {
+      return {
+        name: handler.user_name,
+        date: handler.timestamp,
+        role: handler.role,
+        completed: handler.completed
+      };
+    }
+
+    // Fallback to old method if workflow_handlers not available
     switch (stage) {
       case 'INITIATED':
         return {
@@ -27,10 +47,9 @@ const InspectionWorkflowProgress = ({ inspection }) => {
           date: inspection.stock_filled_at
         };
       case 'CENTRAL_REGISTER':
-        // Central register is handled by same person who submitted stock details
         return {
-          name: inspection.stock_filled_by_name,
-          date: inspection.stock_filled_at
+          name: inspection.central_store_filled_by_name,
+          date: inspection.central_store_filled_at
         };
       case 'AUDIT_REVIEW':
         return {
@@ -60,7 +79,16 @@ const InspectionWorkflowProgress = ({ inspection }) => {
 
   const getStageStatus = (index, stage) => {
     if (isRejected) {
-      return index <= currentIndex ? 'rejected' : 'pending';
+      // Stages before rejection are completed
+      if (index < currentIndex) {
+        return 'completed';
+      }
+      // The rejection stage itself is rejected
+      if (index === currentIndex) {
+        return 'rejected';
+      }
+      // Stages after rejection are pending
+      return 'pending';
     }
     if (isCompleted) {
       return 'completed';
@@ -149,16 +177,16 @@ const InspectionWorkflowProgress = ({ inspection }) => {
                     <p className="text-xs text-gray-500 mt-0.5">
                       {stage.description}
                     </p>
-                    {/* Handler Name and Date for completed stages */}
-                    {(status === 'completed' || status === 'current') && getStageHandlerInfo(stage.stage).name && (
-                      <p className="text-xs font-bold text-gray-900 mt-1">
-                        By: {getStageHandlerInfo(stage.stage).name}
+                    {/* Handler Name and Date for completed/rejected stages */}
+                    {(status === 'completed' || status === 'current' || status === 'rejected') && getStageHandlerInfo(stage.stage).name && (
+                      <p className={`text-xs mt-1 ${status === 'rejected' ? 'text-red-700' : 'text-gray-700'}`}>
+                        <span className={status === 'rejected' ? 'text-red-500' : 'text-gray-500'}>By:</span> {getStageHandlerInfo(stage.stage).name}
                       </p>
                     )}
-                    {/* Handler Date for completed stages */}
-                    {(status === 'completed' || status === 'current') && getStageHandlerInfo(stage.stage).date && (
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        On: {formatDate(getStageHandlerInfo(stage.stage).date)}
+                    {/* Handler Date for completed/rejected stages */}
+                    {(status === 'completed' || status === 'current' || status === 'rejected') && getStageHandlerInfo(stage.stage).date && (
+                      <p className={`text-xs mt-0.5 ${status === 'rejected' ? 'text-red-600' : 'text-gray-500'}`}>
+                        {formatDate(getStageHandlerInfo(stage.stage).date)}
                       </p>
                     )}
                   </div>
@@ -176,13 +204,43 @@ const InspectionWorkflowProgress = ({ inspection }) => {
 
       {/* Rejection Info */}
       {isRejected && inspection.rejection_reason && (
-        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-          <p className="text-xs font-medium text-red-800 mb-1">Rejection Reason:</p>
-          <p className="text-xs text-red-700">{inspection.rejection_reason}</p>
-          {inspection.rejected_by_name && (
-            <p className="text-xs text-red-600 mt-1">
-              Rejected by: {inspection.rejected_by_name}
-            </p>
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+          <p className="text-sm font-semibold text-red-900 mb-2">Certificate Rejected</p>
+
+          {/* Rejection Details */}
+          <div className="space-y-2 mb-3">
+            <div>
+              <p className="text-xs font-medium text-red-700">Rejected At:</p>
+              <p className="text-xs text-red-800">{inspection.rejection_stage?.replace('_', ' ')}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-red-700">Rejected By:</p>
+              <p className="text-xs text-red-800">{inspection.rejected_by_name || 'N/A'}</p>
+            </div>
+            {inspection.rejected_at && (
+              <div>
+                <p className="text-xs font-medium text-red-700">Rejection Date:</p>
+                <p className="text-xs text-red-800">{formatDate(inspection.rejected_at)}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs font-medium text-red-700">Reason:</p>
+              <p className="text-xs text-red-800">{inspection.rejection_reason}</p>
+            </div>
+          </div>
+
+          {/* Show completed stages before rejection */}
+          {handlers.filter(h => h.completed && h.user_name).length > 0 && (
+            <div className="pt-2 border-t border-red-200">
+              <p className="text-xs font-medium text-red-700 mb-1">Stages Completed Before Rejection:</p>
+              <div className="space-y-1">
+                {handlers.filter(h => h.completed && h.user_name).map((handler) => (
+                  <div key={handler.stage} className="text-xs text-red-800">
+                    • {handler.label}: {handler.user_name} ({formatDate(handler.timestamp)})
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

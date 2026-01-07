@@ -207,7 +207,7 @@ const InspectionStage4Form = ({ inspection, isReadOnly, onSave, saving }) => {
           {inspection.created_at && (
             <p>
               <span className="font-medium">Created:</span>{' '}
-              {new Date(inspection.created_at).toLocaleString()} by {inspection.created_by_name}
+              {new Date(inspection.created_at).toLocaleString()} by {inspection.initiated_by_name}
             </p>
           )}
           {inspection.submitted_at && (

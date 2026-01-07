@@ -167,7 +167,7 @@ const MaintenancePaper = () => {
             {current_maintenance.cost && (
               <div className="info-row">
                 <span className="info-label">Cost:</span>
-                <span className="info-value">₹{parseFloat(current_maintenance.cost).toLocaleString()}</span>
+                <span className="info-value">Rs. {parseFloat(current_maintenance.cost).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
             {current_maintenance.vendor_name && (
@@ -212,7 +212,7 @@ const MaintenancePaper = () => {
                     <td>{new Date(record.completed_date).toLocaleDateString()}</td>
                     <td>{record.maintenance_type}</td>
                     <td>{record.description || '-'}</td>
-                    <td>{record.cost ? `₹${parseFloat(record.cost).toLocaleString()}` : '-'}</td>
+                    <td>{record.cost ? `Rs. ${parseFloat(record.cost).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
                     <td>{record.vendor_name || '-'}</td>
                     <td>{record.scheduled_by || '-'}</td>
                   </tr>
@@ -243,7 +243,7 @@ const MaintenancePaper = () => {
               <div className="stat-label">In Progress</div>
             </div>
             <div className="stat-card highlight">
-              <div className="stat-value">₹{parseFloat(statistics.total_cost || 0).toLocaleString()}</div>
+              <div className="stat-value">Rs. {parseFloat(statistics.total_cost || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               <div className="stat-label">Total Maintenance Cost</div>
             </div>
           </div>
