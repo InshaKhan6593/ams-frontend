@@ -13,6 +13,51 @@ const InspectionWorkflowProgress = ({ inspection }) => {
   // Find current stage index
   const currentIndex = stages.findIndex(s => s.stage === currentStage);
 
+  // Get handler info for a specific stage
+  const getStageHandlerInfo = (stage) => {
+    switch (stage) {
+      case 'INITIATED':
+        return {
+          name: inspection.initiated_by_name,
+          date: inspection.initiated_at
+        };
+      case 'STOCK_DETAILS':
+        return {
+          name: inspection.stock_filled_by_name,
+          date: inspection.stock_filled_at
+        };
+      case 'CENTRAL_REGISTER':
+        // Central register is handled by same person who submitted stock details
+        return {
+          name: inspection.stock_filled_by_name,
+          date: inspection.stock_filled_at
+        };
+      case 'AUDIT_REVIEW':
+        return {
+          name: inspection.auditor_reviewed_by_name,
+          date: inspection.auditor_reviewed_at
+        };
+      case 'COMPLETED':
+        return {
+          name: inspection.auditor_reviewed_by_name,
+          date: inspection.auditor_reviewed_at
+        };
+      case 'REJECTED':
+        return {
+          name: inspection.rejected_by_name,
+          date: inspection.rejected_at
+        };
+      default:
+        return { name: null, date: null };
+    }
+  };
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
   const getStageStatus = (index, stage) => {
     if (isRejected) {
       return index <= currentIndex ? 'rejected' : 'pending';
@@ -93,7 +138,7 @@ const InspectionWorkflowProgress = ({ inspection }) => {
                   
                   {/* Stage Info */}
                   <div className="mt-2 text-center">
-                    <p className={`text-xs font-medium ${
+                    <p className={`text-sm font-bold ${
                       status === 'current' ? 'text-blue-600' :
                       status === 'completed' ? 'text-green-600' :
                       status === 'rejected' ? 'text-red-600' :
@@ -104,6 +149,18 @@ const InspectionWorkflowProgress = ({ inspection }) => {
                     <p className="text-xs text-gray-500 mt-0.5">
                       {stage.description}
                     </p>
+                    {/* Handler Name and Date for completed stages */}
+                    {(status === 'completed' || status === 'current') && getStageHandlerInfo(stage.stage).name && (
+                      <p className="text-xs font-bold text-gray-900 mt-1">
+                        By: {getStageHandlerInfo(stage.stage).name}
+                      </p>
+                    )}
+                    {/* Handler Date for completed stages */}
+                    {(status === 'completed' || status === 'current') && getStageHandlerInfo(stage.stage).date && (
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        On: {formatDate(getStageHandlerInfo(stage.stage).date)}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -114,14 +171,6 @@ const InspectionWorkflowProgress = ({ inspection }) => {
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Current Handler */}
-      <div className="mt-4 pt-3 border-t border-gray-200">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-600">Current Handler:</span>
-          <span className="font-medium text-gray-900">{inspection.current_handler}</span>
         </div>
       </div>
 

@@ -1,12 +1,13 @@
 // src/pages/Inspections/InspectionDetails.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { 
-  ArrowLeft, Download, Package, MapPin, Calendar, User, 
+import {
+  ArrowLeft, Download, Package, MapPin, Calendar, User,
   FileText, CheckCircle, XCircle, AlertCircle, Clock
 } from 'lucide-react';
 import { inspectionsAPI } from '../../api/inspections';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import InspectionWorkflowProgress from './InspectionWorkflowProgress';
 
 const InspectionDetails = () => {
   const navigate = useNavigate();
@@ -99,44 +100,6 @@ const InspectionDetails = () => {
     );
   };
 
-  const getStageHandlerInfo = () => {
-    const stage = inspection.stage;
-    let handlerName = 'N/A';
-    let handledAt = 'N/A';
-
-    switch (stage) {
-      case 'INITIATED':
-        handlerName = inspection.initiated_by_name || 'N/A';
-        handledAt = inspection.initiated_at ? new Date(inspection.initiated_at).toLocaleDateString() : 'N/A';
-        break;
-      case 'STOCK_DETAILS':
-        handlerName = inspection.stock_filled_by_name || 'N/A';
-        handledAt = inspection.stock_filled_at ? new Date(inspection.stock_filled_at).toLocaleDateString() : 'N/A';
-        break;
-      case 'CENTRAL_REGISTER':
-        handlerName = inspection.stock_filled_by_name || 'N/A';
-        handledAt = inspection.stock_filled_at ? new Date(inspection.stock_filled_at).toLocaleDateString() : 'N/A';
-        break;
-      case 'AUDIT_REVIEW':
-        handlerName = inspection.auditor_reviewed_by_name || 'N/A';
-        handledAt = inspection.auditor_reviewed_at ? new Date(inspection.auditor_reviewed_at).toLocaleDateString() : 'N/A';
-        break;
-      case 'COMPLETED':
-        handlerName = inspection.auditor_reviewed_by_name || 'N/A';
-        handledAt = inspection.auditor_reviewed_at ? new Date(inspection.auditor_reviewed_at).toLocaleDateString() : 'N/A';
-        break;
-      case 'REJECTED':
-        handlerName = inspection.rejected_by_name || 'N/A';
-        handledAt = inspection.rejected_at ? new Date(inspection.rejected_at).toLocaleDateString() : 'N/A';
-        break;
-      default:
-        handlerName = 'N/A';
-        handledAt = 'N/A';
-    }
-
-    return { handlerName, handledAt };
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -208,23 +171,7 @@ const InspectionDetails = () => {
       </div>
 
       {/* Workflow Section */}
-      <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3">
-        <h2 className="text-xs font-semibold text-gray-900 mb-2">Workflow</h2>
-        <div className="flex items-start gap-3">
-          <div className="flex-1">
-            <p className="text-xs text-gray-600 mb-1">Current Stage</p>
-            <p className="text-sm font-medium text-gray-900">{inspection.stage_display || inspection.stage}</p>
-          </div>
-          <div className="flex-1">
-            <p className="text-xs text-gray-600 mb-1">Handled By</p>
-            <p className="text-sm font-medium text-gray-900">{getStageHandlerInfo().handlerName}</p>
-          </div>
-          <div className="flex-1">
-            <p className="text-xs text-gray-600 mb-1">Handled On</p>
-            <p className="text-sm font-medium text-gray-900">{getStageHandlerInfo().handledAt}</p>
-          </div>
-        </div>
-      </div>
+      <InspectionWorkflowProgress inspection={inspection} />
 
       {/* Basic Information */}
       <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3">
