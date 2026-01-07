@@ -445,7 +445,7 @@ const InspectionForm = () => {
           </button>
           <div>
             <h1 className="text-sm font-bold text-gray-900">
-              {isEditMode ? `Inspection Certificate: ${inspection.certificate_no}` : 'New Inspection Certificate'}
+              {isEditMode ? `Inspection Certificate: ${inspection.contract_no}` : 'New Inspection Certificate'}
             </h1>
             <p className="text-xs text-gray-600 mt-0">
               {inspection.stage_display || 'Stage 1: Basic Information'}

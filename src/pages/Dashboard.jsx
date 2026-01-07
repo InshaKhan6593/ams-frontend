@@ -69,7 +69,7 @@ const Dashboard = () => {
 
     const recentInspections = (recentActivityData.inspections || []).map((inspection) => ({
       type: 'inspection',
-      title: `Inspection: ${inspection.certificate_no}`,
+      title: `Inspection: ${inspection.contract_no}`,
       subtitle: `${inspection.department_name || 'Unknown Department'}`,
       time: inspection.created_at,
       status: inspection.stage,

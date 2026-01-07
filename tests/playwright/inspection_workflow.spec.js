@@ -82,7 +82,7 @@ test.describe('Inspection Certificate Workflow', () => {
 
     // Fill inspection certificate details
     const certNumber = `INSP-${Date.now()}`;
-    await page.fill('input[name="certificate_number"], input[placeholder*="certificate"]', certNumber);
+    await page.fill('input[name="contract_number"], input[placeholder*="certificate"]', certNumber);
 
     await page.fill('input[name="vendor_name"], input[placeholder*="vendor"]', 'Tech Supplies Inc.');
     await page.fill('input[name="invoice_number"], input[placeholder*="invoice"]', `INV-${Date.now()}`);

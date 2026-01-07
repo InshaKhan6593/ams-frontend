@@ -15,6 +15,7 @@ import {
   ArrowRightLeft,
   QrCode,
   Wrench,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -56,6 +57,12 @@ const Sidebar = () => {
 
   // Define all menu items with permission requirements
   const allMenuItems = [
+    {
+      name: 'Dashboard',
+      icon: LayoutDashboard,
+      path: '/dashboard',
+      alwaysShow: true,
+    },
     {
       name: 'Stock Entries',
       icon: Package,

@@ -50,7 +50,7 @@ const InspectionDetails = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `IC-${inspection.certificate_no}.pdf`);
+      link.setAttribute('download', `Inspection-${inspection.contract_no}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
@@ -90,13 +90,51 @@ const InspectionDetails = () => {
     };
     const badge = badges[status] || badges.DRAFT;
     const Icon = badge.icon;
-    
+
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${badge.bg} ${badge.text}`}>
         <Icon className="w-3 h-3" />
         {status}
       </span>
     );
+  };
+
+  const getStageHandlerInfo = () => {
+    const stage = inspection.stage;
+    let handlerName = 'N/A';
+    let handledAt = 'N/A';
+
+    switch (stage) {
+      case 'INITIATED':
+        handlerName = inspection.initiated_by_name || 'N/A';
+        handledAt = inspection.initiated_at ? new Date(inspection.initiated_at).toLocaleDateString() : 'N/A';
+        break;
+      case 'STOCK_DETAILS':
+        handlerName = inspection.stock_filled_by_name || 'N/A';
+        handledAt = inspection.stock_filled_at ? new Date(inspection.stock_filled_at).toLocaleDateString() : 'N/A';
+        break;
+      case 'CENTRAL_REGISTER':
+        handlerName = inspection.stock_filled_by_name || 'N/A';
+        handledAt = inspection.stock_filled_at ? new Date(inspection.stock_filled_at).toLocaleDateString() : 'N/A';
+        break;
+      case 'AUDIT_REVIEW':
+        handlerName = inspection.auditor_reviewed_by_name || 'N/A';
+        handledAt = inspection.auditor_reviewed_at ? new Date(inspection.auditor_reviewed_at).toLocaleDateString() : 'N/A';
+        break;
+      case 'COMPLETED':
+        handlerName = inspection.auditor_reviewed_by_name || 'N/A';
+        handledAt = inspection.auditor_reviewed_at ? new Date(inspection.auditor_reviewed_at).toLocaleDateString() : 'N/A';
+        break;
+      case 'REJECTED':
+        handlerName = inspection.rejected_by_name || 'N/A';
+        handledAt = inspection.rejected_at ? new Date(inspection.rejected_at).toLocaleDateString() : 'N/A';
+        break;
+      default:
+        handlerName = 'N/A';
+        handledAt = 'N/A';
+    }
+
+    return { handlerName, handledAt };
   };
 
   if (loading) {
@@ -140,7 +178,7 @@ const InspectionDetails = () => {
         </button>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-sm font-bold text-gray-900">IC-{inspection.certificate_no}</h1>
+            <h1 className="text-sm font-bold text-gray-900">Contract: {inspection.contract_no}</h1>
             <p className="text-xs text-gray-600 mt-0.5">Inspection Certificate Details</p>
           </div>
           <div className="flex items-center gap-2">
@@ -169,28 +207,29 @@ const InspectionDetails = () => {
         </div>
       </div>
 
+      {/* Workflow Section */}
+      <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3">
+        <h2 className="text-xs font-semibold text-gray-900 mb-2">Workflow</h2>
+        <div className="flex items-start gap-3">
+          <div className="flex-1">
+            <p className="text-xs text-gray-600 mb-1">Current Stage</p>
+            <p className="text-sm font-medium text-gray-900">{inspection.stage_display || inspection.stage}</p>
+          </div>
+          <div className="flex-1">
+            <p className="text-xs text-gray-600 mb-1">Handled By</p>
+            <p className="text-sm font-medium text-gray-900">{getStageHandlerInfo().handlerName}</p>
+          </div>
+          <div className="flex-1">
+            <p className="text-xs text-gray-600 mb-1">Handled On</p>
+            <p className="text-sm font-medium text-gray-900">{getStageHandlerInfo().handledAt}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Basic Information */}
       <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3">
-        <h2 className="text-xs font-semibold text-gray-900 mb-2">Certificate Information</h2>
+        <h2 className="text-xs font-semibold text-gray-900 mb-2">Contract Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <div className="flex items-start gap-2">
-            <FileText className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs text-gray-600">Certificate No</p>
-              <p className="text-xs font-medium text-gray-900">IC-{inspection.certificate_no}</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-2">
-            <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs text-gray-600">Date</p>
-              <p className="text-xs font-medium text-gray-900">
-                {inspection.date_of_inspection ? new Date(inspection.date_of_inspection).toLocaleDateString() : 'N/A'}
-              </p>
-            </div>
-          </div>
-
           <div className="flex items-start gap-2">
             <FileText className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
             <div>

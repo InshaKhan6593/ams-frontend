@@ -198,7 +198,7 @@ const NotificationBell = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <p className="text-xs font-semibold text-gray-900 truncate">
-                                  {inspection.certificate_no}
+                                  {inspection.contract_no}
                                 </p>
                                 <span className={`px-1.5 py-0.5 text-[9px] font-semibold rounded whitespace-nowrap ${getStageColor(inspection.stage)}`}>
                                   {getStageLabel(inspection.stage)}

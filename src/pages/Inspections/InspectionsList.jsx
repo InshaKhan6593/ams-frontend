@@ -1,7 +1,7 @@
 // src/pages/Inspections/InspectionsList.jsx
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Search, FileText, Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, Search, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useInspections } from '../../hooks/queries';
 import { useDebounce } from '../../utils/debounce';
@@ -10,6 +10,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const InspectionsList = () => {
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [stageFilter, setStageFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -29,7 +30,6 @@ const InspectionsList = () => {
   const filteredInspections = useMemo(() => {
     return inspections.filter((inspection) => {
       const matchesSearch = !searchTerm ||
-        inspection.certificate_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inspection.contractor_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (inspection.contract_no && inspection.contract_no.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -215,32 +215,39 @@ const InspectionsList = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Certificate</th>
+                <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Contract</th>
                 <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Contractor</th>
-                <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Department</th>
+                <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Location</th>
                 <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Workflow</th>
                 <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Stage</th>
                 <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Status</th>
                 <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Items</th>
-                <th className="px-2 py-1 text-right text-xs font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredInspections.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-2 py-6 text-center text-xs text-gray-500">
+                  <td colSpan="7" className="px-2 py-6 text-center text-xs text-gray-500">
                     No inspection certificates found
                   </td>
                 </tr>
               ) : (
                 filteredInspections.map((inspection) => (
-                  <tr key={inspection.id} className="hover:bg-gray-50">
+                  <tr
+                    key={inspection.id}
+                    onClick={() => navigate(
+                      inspection.stage === 'COMPLETED'
+                        ? `/dashboard/inspections/${inspection.id}/view`
+                        : `/dashboard/inspections/${inspection.id}/edit`
+                    )}
+                    className="hover:bg-blue-50 cursor-pointer transition-colors"
+                  >
                     <td className="px-2 py-1">
                       <div className="flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-gray-900 font-mono">
-                            {inspection.certificate_no}
+                          <p className="text-xs font-medium text-gray-900">
+                            {inspection.contract_no}
                           </p>
                           <p className="text-xs text-gray-500">
                             {new Date(inspection.created_at).toLocaleDateString()}
@@ -249,12 +256,9 @@ const InspectionsList = () => {
                       </div>
                     </td>
                     <td className="px-2 py-1">
-                      <div className="text-xs">
-                        <p className="font-medium text-gray-900 truncate">{inspection.contractor_name}</p>
-                        {inspection.contract_no && (
-                          <p className="text-gray-500">{inspection.contract_no}</p>
-                        )}
-                      </div>
+                      <span className="text-xs font-medium text-gray-900 truncate block">
+                        {inspection.contractor_name}
+                      </span>
                     </td>
                     <td className="px-2 py-1">
                       <span className="text-xs text-gray-700">{inspection.department_name}</span>
@@ -282,18 +286,6 @@ const InspectionsList = () => {
                     </td>
                     <td className="px-2 py-1">
                       <span className="text-xs text-gray-600">{inspection.total_items_count || 0}</span>
-                    </td>
-                    <td className="px-2 py-1 text-right">
-                      <Link
-                        to={inspection.stage === 'COMPLETED' 
-                          ? `/dashboard/inspections/${inspection.id}/view`
-                          : `/dashboard/inspections/${inspection.id}/edit`
-                        }
-                        className="inline-flex items-center gap-1 p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                        title={inspection.stage === 'COMPLETED' ? 'View' : 'View/Edit'}
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </Link>
                     </td>
                   </tr>
                 ))

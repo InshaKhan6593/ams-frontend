@@ -37,7 +37,7 @@ const InspectionStage4Form = ({ inspection, isReadOnly, onSave, saving }) => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="bg-white rounded-lg p-2">
             <p className="text-xs text-gray-600">Certificate No</p>
-            <p className="text-sm font-bold text-gray-900">{inspection.certificate_no}</p>
+            <p className="text-sm font-bold text-gray-900">{inspection.contract_no}</p>
           </div>
           <div className="bg-white rounded-lg p-2">
             <p className="text-xs text-gray-600">Department</p>
