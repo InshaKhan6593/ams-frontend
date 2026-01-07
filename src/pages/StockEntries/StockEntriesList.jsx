@@ -1,26 +1,9 @@
 // src/pages/StockEntries/StockEntriesList.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, Package, ArrowRight, Clock, CheckCircle, XCircle, Eye, Loader, Download } from 'lucide-react';
 import { stockEntriesAPI } from '../../api/stockEntries';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
-
-// Debounce hook
-const useDebounce = (value, delay) => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
 
 const StockEntriesList = () => {
   const navigate = useNavigate();
@@ -36,12 +19,9 @@ const StockEntriesList = () => {
     search: '',
   });
 
-  // Debounce search input
-  const debouncedSearch = useDebounce(filters.search, 500);
-
   useEffect(() => {
     fetchStockEntries(true);
-  }, [filters.entry_type, filters.status, debouncedSearch]);
+  }, []);
 
   const fetchStockEntries = async (reset = false) => {
     try {
@@ -52,10 +32,6 @@ const StockEntriesList = () => {
       }
 
       const params = { page: reset ? 1 : getPageNumber(nextPage) };
-      if (filters.entry_type) params.entry_type = filters.entry_type;
-      if (filters.status) params.status = filters.status;
-      if (debouncedSearch) params.search = debouncedSearch;
-
       const data = await stockEntriesAPI.getAll(params);
 
       if (reset) {
@@ -86,16 +62,24 @@ const StockEntriesList = () => {
     }
   };
 
+  const filteredEntries = useMemo(() => {
+    return stockEntries.filter((entry) => {
+      const matchesSearch = !filters.search ||
+        entry.entry_number?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        entry.item_name?.toLowerCase().includes(filters.search.toLowerCase()) ||
+        entry.purpose?.toLowerCase().includes(filters.search.toLowerCase());
+
+      const matchesType = !filters.entry_type || entry.entry_type === filters.entry_type;
+      const matchesStatus = !filters.status || entry.status === filters.status;
+
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }, [stockEntries, filters.search, filters.entry_type, filters.status]);
+
   const handleDownloadCSV = async () => {
     try {
       setDownloading(true);
-      // Pass current filters to export only filtered data
-      const params = {};
-      if (filters.entry_type) params.entry_type = filters.entry_type;
-      if (filters.status) params.status = filters.status;
-      if (debouncedSearch) params.search = debouncedSearch;
-
-      await stockEntriesAPI.exportCSV(params);
+      await stockEntriesAPI.exportCSV();
     } catch (err) {
       console.error('Failed to download CSV:', err);
       alert('Failed to download CSV file');
@@ -138,7 +122,7 @@ const StockEntriesList = () => {
     );
   };
 
-  if (loading) {
+  if (loading && stockEntries.length === 0) {
     return <LoadingSpinner />;
   }
 
@@ -192,7 +176,7 @@ const StockEntriesList = () => {
               type="text"
               placeholder="Entry number, item..."
               value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
               className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
           </div>
@@ -204,7 +188,7 @@ const StockEntriesList = () => {
             </label>
             <select
               value={filters.entry_type}
-              onChange={(e) => setFilters({ ...filters, entry_type: e.target.value })}
+              onChange={(e) => setFilters(prev => ({ ...prev, entry_type: e.target.value }))}
               className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               <option value="">All Types</option>
@@ -222,7 +206,7 @@ const StockEntriesList = () => {
             </label>
             <select
               value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
               className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               <option value="">All Status</option>
@@ -237,14 +221,14 @@ const StockEntriesList = () => {
         {/* Results counter */}
         <div className="mt-2 pt-2 border-t border-gray-200">
           <p className="text-xs text-gray-600">
-            Showing {stockEntries.length} of {totalCount} entries
+            Showing {filteredEntries.length} of {totalCount} entries
           </p>
         </div>
       </div>
 
       {/* Entries List */}
       <div className="space-y-1.5">
-        {stockEntries.length === 0 ? (
+        {filteredEntries.length === 0 && !loading ? (
           <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
             <Package className="h-10 w-10 text-gray-400 mx-auto mb-2" />
             <h3 className="text-sm font-semibold text-gray-900 mb-1">No stock entries found</h3>
@@ -256,7 +240,7 @@ const StockEntriesList = () => {
           </div>
         ) : (
           <>
-            {stockEntries.map((entry) => (
+            {filteredEntries.map((entry) => (
               <div
                 key={entry.id}
                 onClick={() => navigate(`/dashboard/stock-entries/${entry.id}`)}
