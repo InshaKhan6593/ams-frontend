@@ -1,5 +1,5 @@
 // src/pages/Inspections/InspectionStage3Form.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link2, Plus, Search, Eye, Check, X, AlertCircle, Package, FolderPlus, ChevronDown, ChevronUp, Unlink, Edit2, Save } from 'lucide-react';
 import { inspectionsAPI } from '../../api/inspections';
 import { itemsAPI, categoriesAPI } from '../../api/items';
@@ -946,8 +946,15 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
   });
   const [allCategories, setAllCategories] = useState([]);
   const [hierarchicalCategories, setHierarchicalCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
   const [selectedCategoryTrackingType, setSelectedCategoryTrackingType] = useState(null);
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const categoryDropdownRef = useRef(null);
+  const [acctUnitSearchQuery, setAcctUnitSearchQuery] = useState('');
+  const [showAcctUnitDropdown, setShowAcctUnitDropdown] = useState(false);
+  const acctUnitDropdownRef = useRef(null);
 
   const fetchAllCategories = async () => {
     try {
@@ -960,6 +967,7 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
 
       const broader = activeCategories.filter(cat => !cat.parent_category);
       const hierarchical = [];
+      const subs = [];
 
       broader.forEach(broaderCat => {
         hierarchical.push({
@@ -968,17 +976,21 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
           displayName: `${broaderCat.name} (${broaderCat.tracking_type})`
         });
 
-        const subs = activeCategories.filter(cat => cat.parent_category === broaderCat.id);
-        subs.forEach(subCat => {
-          hierarchical.push({
+        const subCats = activeCategories.filter(cat => cat.parent_category === broaderCat.id);
+        subCats.forEach(subCat => {
+          const subWithParent = {
             ...subCat,
             level: 1,
-            displayName: `  ↳ ${subCat.name} (${subCat.tracking_type || broaderCat.tracking_type})`
-          });
+            displayName: `${subCat.name} (${subCat.tracking_type || broaderCat.tracking_type})`,
+            parentName: broaderCat.name
+          };
+          hierarchical.push(subWithParent);
+          subs.push(subWithParent);
         });
       });
 
       setHierarchicalCategories(hierarchical);
+      setSubCategories(subs);
     } catch (err) {
       console.error('Error fetching categories:', err);
     } finally {
@@ -1002,6 +1014,25 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
   useEffect(() => {
     fetchAllCategories();
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+        setShowCategoryDropdown(false);
+      }
+      if (acctUnitDropdownRef.current && !acctUnitDropdownRef.current.contains(event.target)) {
+        setShowAcctUnitDropdown(false);
+      }
+    };
+
+    if (showCategoryDropdown || showAcctUnitDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCategoryDropdown, showAcctUnitDropdown]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -1150,31 +1181,78 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
                   Category <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                    className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 max-h-48 overflow-y-auto"
-                    style={{ maxHeight: '12rem' }}
-                    required
-                    disabled={loadingData}
-                    size="1"
-                  >
-                    <option value="">Select category</option>
-                    {hierarchicalCategories.map(cat => (
-                      <option
-                        key={cat.id}
-                        value={cat.id}
-                        className={cat.level === 0 ? 'font-semibold bg-gray-50' : 'font-normal'}
-                        style={{
-                          paddingLeft: cat.level === 0 ? '0.5rem' : '1.5rem',
-                          fontWeight: cat.level === 0 ? '600' : '400'
-                        }}
+                  <div className="flex-1 relative" ref={categoryDropdownRef}>
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={categorySearchQuery}
+                        onChange={(e) => setCategorySearchQuery(e.target.value)}
+                        onFocus={() => setShowCategoryDropdown(true)}
+                        placeholder="Search sub-categories..."
+                        className="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        required
+                        disabled={loadingData}
+                      />
+                      {formData.category && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, category: '' }));
+                            setCategorySearchQuery('');
+                            setSelectedCategoryTrackingType(null);
+                          }}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {showCategoryDropdown && (
+                      <div 
+                        className={`absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${
+                          subCategories.length >= 6 ? 'max-h-48 overflow-y-auto' : ''
+                        }`}
+                        style={{ maxHeight: subCategories.length >= 6 ? '12rem' : 'auto' }}
                       >
-                        {cat.displayName}
-                      </option>
-                    ))}
-                  </select>
+                        {subCategories.filter(cat => 
+                          cat.displayName.toLowerCase().includes(categorySearchQuery.toLowerCase())
+                        ).map(cat => (
+                          <div
+                            key={cat.id}
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, category: cat.id.toString() }));
+                              setCategorySearchQuery(cat.displayName);
+                              setShowCategoryDropdown(false);
+                              const selectedCategory = allCategories.find(c => c.id === cat.id);
+                              if (selectedCategory) {
+                                const trackingType = selectedCategory.tracking_type || selectedCategory.inherited_tracking_type;
+                                setSelectedCategoryTrackingType(trackingType);
+                              }
+                            }}
+                            className={`p-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                              formData.category === cat.id.toString() ? 'bg-blue-50' : ''
+                            }`}
+                          >
+                            <span className="text-gray-700 font-normal">
+                              {cat.name}
+                            </span>
+                            <span className="text-xs text-gray-500 ml-2">
+                              ({cat.parentName})
+                            </span>
+                          </div>
+                        ))}
+                        {subCategories.filter(cat => 
+                          cat.displayName.toLowerCase().includes(categorySearchQuery.toLowerCase())
+                        ).length === 0 && (
+                          <div className="p-2 text-xs text-gray-500 text-center">
+                            No sub-categories found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowCreateSubCategoryModal(true)}
@@ -1184,9 +1262,9 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
                     <FolderPlus className="w-4 h-4" />
                   </button>
                 </div>
-              {hierarchicalCategories.length === 0 && !loadingData && (
+              {subCategories.length === 0 && !loadingData && (
                 <p className="text-xs text-amber-600 mt-1">
-                  No categories available. Create categories first.
+                  No sub-categories available. Create sub-categories first.
                 </p>
               )}
               <p className="text-xs text-gray-500 mt-1">
@@ -1220,27 +1298,68 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Accounting Unit <span className="text-red-500">*</span>
               </label>
-              <select
-                name="acct_unit"
-                value={formData.acct_unit}
-                onChange={handleChange}
-                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-              >
-                <option value="">Select unit</option>
-                {Object.entries(UNIT_GROUPS).map(([groupName, unitValues]) => (
-                  <optgroup key={groupName} label={groupName}>
-                    {unitValues.map(unitValue => {
-                      const unit = ACCOUNTING_UNITS.find(u => u.value === unitValue);
-                      return unit ? (
-                        <option key={unit.value} value={unit.value}>
+              <div className="relative" ref={acctUnitDropdownRef}>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={acctUnitSearchQuery}
+                    onChange={(e) => setAcctUnitSearchQuery(e.target.value)}
+                    onFocus={() => setShowAcctUnitDropdown(true)}
+                    placeholder="Search units..."
+                    className="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    required
+                  />
+                  {formData.acct_unit && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, acct_unit: '' }));
+                        setAcctUnitSearchQuery('');
+                      }}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                {showAcctUnitDropdown && (
+                  <div 
+                    className={`absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${
+                      ACCOUNTING_UNITS.length >= 6 ? 'max-h-48 overflow-y-auto' : ''
+                    }`}
+                    style={{ maxHeight: ACCOUNTING_UNITS.length >= 6 ? '12rem' : 'auto' }}
+                  >
+                    {ACCOUNTING_UNITS.filter(unit => 
+                      unit.label.toLowerCase().includes(acctUnitSearchQuery.toLowerCase())
+                    ).map(unit => (
+                      <div
+                        key={unit.value}
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, acct_unit: unit.value }));
+                          setAcctUnitSearchQuery(unit.label);
+                          setShowAcctUnitDropdown(false);
+                        }}
+                        className={`p-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                          formData.acct_unit === unit.value ? 'bg-blue-50' : ''
+                        }`}
+                      >
+                        <span className="text-gray-700 font-normal text-xs">
                           {unit.label}
-                        </option>
-                      ) : null;
-                    })}
-                  </optgroup>
-                ))}
-              </select>
+                        </span>
+                      </div>
+                    ))}
+                    {ACCOUNTING_UNITS.filter(unit => 
+                      unit.label.toLowerCase().includes(acctUnitSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <div className="p-2 text-xs text-gray-500 text-center">
+                        No units found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <p className="text-xs text-gray-500 mt-0.5">
                 Select the measurement unit for this item
               </p>
