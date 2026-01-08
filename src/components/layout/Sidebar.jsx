@@ -16,6 +16,7 @@ import {
   QrCode,
   Wrench,
   LayoutDashboard,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -23,8 +24,8 @@ import { usersAPI } from '../../api/users';
 import { PERMISSIONS } from '../../constants/permissions';
 
 const Sidebar = () => {
-  const { user, logout } = useAuth();
-  const { hasAnyPermission, hasRole } = usePermissions();
+  const { user, logout, permissions } = useAuth();
+  const { hasAnyPermission, hasRole, isSuperuser, getGroups } = usePermissions();
   const [pendingCounts, setPendingCounts] = useState({
     inspections: 0,
     acknowledgments: 0,
@@ -99,7 +100,14 @@ const Sidebar = () => {
       icon: FileText,
       path: '/dashboard/inspections',
       badge: pendingCounts.inspections,
-      requiredPermissions: [PERMISSIONS.INSPECTIONS.VIEW, PERMISSIONS.INSPECTIONS.INITIATE],
+      requiredPermissions: [
+        PERMISSIONS.INSPECTIONS.VIEW,
+        PERMISSIONS.INSPECTIONS.INITIATE,
+        PERMISSIONS.INSPECTIONS.FILL_STOCK_DETAILS,
+        PERMISSIONS.INSPECTIONS.FILL_CENTRAL_REGISTER,
+        PERMISSIONS.INSPECTIONS.REVIEW_AS_AUDITOR,
+        PERMISSIONS.INSPECTIONS.SUBMIT_STAGE,
+      ],
     },
     {
       name: 'Maintenance',
@@ -117,13 +125,13 @@ const Sidebar = () => {
       name: 'Categories',
       icon: FolderTree,
       path: '/dashboard/categories',
-      requiredPermissions: [PERMISSIONS.ITEMS.VIEW],
+      requiredPermissions: [PERMISSIONS.ITEMS.VIEW, PERMISSIONS.ITEMS.MANAGE_CATEGORIES],
     },
     {
       name: 'Items',
       icon: BoxIcon,
       path: '/dashboard/items',
-      requiredPermissions: [PERMISSIONS.ITEMS.VIEW],
+      requiredPermissions: [PERMISSIONS.ITEMS.VIEW, PERMISSIONS.ITEMS.MANAGE_CATEGORIES],
     },
     {
       name: 'Inventory',
@@ -143,6 +151,12 @@ const Sidebar = () => {
       path: '/dashboard/users',
       requiredPermissions: [PERMISSIONS.USERS.VIEW],
     },
+    {
+      name: 'Administration',
+      icon: Settings,
+      path: '/dashboard/admin',
+      requiredPermissions: [PERMISSIONS.USERS.VIEW],
+    },
   ];
 
   // Filter menu items based on user permissions
@@ -150,8 +164,8 @@ const Sidebar = () => {
     // Always show if explicitly marked
     if (item.alwaysShow) return true;
 
-    // System Admin sees everything
-    if (hasRole('SYSTEM_ADMIN')) return true;
+    // Superuser sees everything
+    if (isSuperuser()) return true;
 
     // Check permission requirement (OR logic - if user has ANY of the required permissions)
     if (item.requiredPermissions?.length > 0) {
@@ -186,7 +200,11 @@ const Sidebar = () => {
             <p className="text-xs font-medium text-gray-900 truncate">
               {user?.full_name || user?.username || 'User'}
             </p>
-            <p className="text-xs text-gray-500 truncate">{user?.role_display || 'User'}</p>
+            <p className="text-xs text-gray-500 truncate">
+              {isSuperuser() ? 'System Admin' :
+               getGroups().length > 0 ? getGroups().join(', ') :
+               user?.role_display || permissions?.role_display || 'User'}
+            </p>
           </div>
         </div>
       </div>

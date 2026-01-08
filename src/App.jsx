@@ -8,8 +8,7 @@ import Layout from './components/layout/Layout';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import UsersList from './pages/Users/UsersList';
 import UserForm from './pages/Users/UserForm';
-import CustomRolesList from './pages/Users/CustomRolesList';
-import CustomRoleForm from './pages/Users/CustomRoleForm';
+import { AdminDashboard, GroupsManagement, PermissionsView } from './pages/Admin';
 import LocationsList from './pages/Locations/LocationsList';
 import LocationForm from './pages/Locations/LocationForm';
 import ItemsList from './pages/Items/ItemsList';
@@ -148,10 +147,10 @@ function AppRoutes() {
         <Route path="users/new" element={<UserForm />} />
         <Route path="users/:id" element={<UserForm />} />
 
-        {/* Custom Roles */}
-        <Route path="users/custom-roles" element={<CustomRolesList />} />
-        <Route path="users/custom-roles/new" element={<CustomRoleForm />} />
-        <Route path="users/custom-roles/:id" element={<CustomRoleForm />} />
+        {/* Admin */}
+        <Route path="admin" element={<AdminDashboard />} />
+        <Route path="admin/groups" element={<GroupsManagement />} />
+        <Route path="admin/permissions" element={<PermissionsView />} />
       </Route>
 
       {/* Redirect root to dashboard */}

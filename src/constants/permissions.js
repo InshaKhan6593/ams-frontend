@@ -31,6 +31,16 @@ export const PERMISSIONS = {
     CREATE: 'can_create_items',
     EDIT: 'can_edit_items',
     DELETE: 'can_delete_items',
+    MANAGE_CATEGORIES: 'can_manage_categories',
+  },
+
+  // Categories
+  CATEGORIES: {
+    VIEW: 'can_view_categories',
+    CREATE: 'can_create_categories',
+    EDIT: 'can_edit_categories',
+    DELETE: 'can_delete_categories',
+    MANAGE: 'can_manage_categories',
   },
 
   // Locations

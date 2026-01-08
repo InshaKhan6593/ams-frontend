@@ -9,7 +9,7 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const ConsumablesInventory = () => {
   const navigate = useNavigate();
-  const { isLocationHead, isSystemAdmin } = usePermissions();
+  const { isLocationHead, isStockIncharge, isSystemAdmin } = usePermissions();
   const [inventoryData, setInventoryData] = useState({ items: [], accessible_stores: [] });
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,10 +17,40 @@ const ConsumablesInventory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [lowStockFilter, setLowStockFilter] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
+  // Initial load - fetch locations first, then set default filter for Stock Incharge
   useEffect(() => {
-    fetchData();
-  }, [locationFilter, lowStockFilter]);
+    const initializeData = async () => {
+      try {
+        setLoading(true);
+        const locationsData = await locationsAPI.getUserAccessibleLocations();
+        const locationsList = Array.isArray(locationsData) ? locationsData : locationsData.results || [];
+        setLocations(locationsList);
+
+        // For Stock Incharge, default to their first assigned store
+        if (isStockIncharge() && !isLocationHead() && !isSystemAdmin()) {
+          const stores = locationsList.filter(l => l.is_store);
+          if (stores.length > 0) {
+            setLocationFilter(stores[0].id.toString());
+          }
+        }
+        setInitialized(true);
+      } catch (err) {
+        console.error('Error initializing:', err);
+        setError('Failed to load locations');
+        setLoading(false);
+      }
+    };
+    initializeData();
+  }, []);
+
+  // Fetch inventory when filter changes (after initialization)
+  useEffect(() => {
+    if (initialized) {
+      fetchData();
+    }
+  }, [locationFilter, lowStockFilter, initialized]);
 
   const fetchData = async () => {
     try {
@@ -32,13 +62,8 @@ const ConsumablesInventory = () => {
       if (lowStockFilter) params.low_stock = 'true';
       if (searchTerm) params.search = searchTerm;
 
-      const [aggregatedData, locationsData] = await Promise.all([
-        consumablesAPI.getAggregated(params),
-        locationsAPI.getUserAccessibleLocations()
-      ]);
-
+      const aggregatedData = await consumablesAPI.getAggregated(params);
       setInventoryData(aggregatedData);
-      setLocations(Array.isArray(locationsData) ? locationsData : locationsData.results || []);
     } catch (err) {
       console.error('Error fetching consumables:', err);
       setError('Failed to load consumables data');

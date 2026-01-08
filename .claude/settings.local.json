@@ -18,7 +18,21 @@
       "Bash(\"./venv/Scripts/python.exe\" -c \"\nwith open\\(''inventory/serializers.py'', ''rb''\\) as f:\n    lines = f.readlines\\(\\)\n    for i, line in enumerate\\(lines[1021:1026], 1022\\):\n        print\\(f''{i}: {line[:80]}''\n\\)\n\")",
       "Bash(\"./venv/Scripts/python.exe\" -c \"\nwith open\\(''inventory/serializers.py'', ''rb''\\) as f:\n    content = f.read\\(\\)\n\n# Remove the corrupted byte sequence\ncorrupted = b''\\\\xc3\\\\x83\\\\xc6\\\\x92\\\\xc3\\\\x82\\\\xc2\\\\xa2\\\\xc3\\\\x83\\\\xc2\\\\xa2\\\\xc3\\\\xa2\\\\xe2\\\\x80\\\\x9a\\\\xc2\\\\xac\\\\xc3\\\\x82\\\\xc2\\\\xa0\\\\xc3\\\\x83\\\\xe2\\\\x80\\\\x9a\\\\xc3\\\\x82\\\\xc2\\\\x90 ''\ncontent = content.replace\\(corrupted, b''''\\)\n\nwith open\\(''inventory/serializers.py'', ''wb''\\) as f:\n    f.write\\(content\\)\nprint\\(''Fixed corrupted bytes''\\)\n\")",
       "Bash(ls:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(dir /b \"C:\\\\Users\\\\Insha Khan\")",
+      "Bash(findstr:*)",
+      "Bash(cat:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(cmd /c \".venv\\\\Scripts\\\\activate && python manage.py shell -c \"\"from django.contrib.auth.models import User, Permission; from user_management.models import UserProfile; user = User.objects.filter\\(username__icontains=''ahab''\\).first\\(\\); print\\(f''User: {user.username} \\(ID: {user.id}\\)''\\) if user else print\\(''Not found''\\); print\\(f''Groups: {list\\(user.groups.values_list\\(chr\\(34\\)+''name''+chr\\(34\\), flat=True\\)\\)}''\\) if user else None; print\\(f''Individual Perms: {list\\(user.user_permissions.values_list\\(chr\\(34\\)+''codename''+chr\\(34\\), flat=True\\)\\)}''\\) if user else None; print\\(f''All Perms with inspection: {[p for p in user.get_all_permissions\\(\\) if chr\\(34\\)+''inspection''+chr\\(34\\) in p.lower\\(\\) or chr\\(34\\)+''initiate''+chr\\(34\\) in p.lower\\(\\)]}''\\) if user else None\"\"\")",
+      "Bash(\"C:/Users/Insha Khan/ams_v3_user/.venv/Scripts/python.exe\" manage.py shell:*)",
+      "Bash(\"C:/Users/Insha Khan/ams_v3_user/venv/Scripts/python.exe\" \"C:/Users/Insha Khan/ams_v3_user/manage.py\" shell:*)",
+      "Bash(\"C:/Users/Insha Khan/ams_v3_user/venv/Scripts/python.exe\" \"C:/Users/Insha Khan/ams_v3_user/manage.py\" shell -c:*)",
+      "Bash(\"C:/Users/Insha Khan/ams_v3_user/venv/Scripts/python.exe\" \"C:/Users/Insha Khan/ams_v3_user/manage.py\" shell -c \"\nfrom django.contrib.auth.models import User\n\nuser = User.objects.get\\(username=''khan''\\)\nprint\\(''Has initiate_inspectioncertificate:'', user.has_perm\\(''inventory.initiate_inspectioncertificate''\\)\\)\nprint\\(''User permissions:'', list\\(user.user_permissions.values_list\\(''codename'', flat=True\\)\\)\\)\nprint\\(''Groups:'', list\\(user.groups.values_list\\(''name'', flat=True\\)\\)\\)\n\")",
+      "Bash(\"C:/Users/Insha Khan/ams_v3_user/venv/Scripts/python.exe\" \"C:/Users/Insha Khan/ams_v3_user/manage.py\" shell -c \"\nfrom django.contrib.auth.models import User\nfrom inventory.models import Location\n\nuser = User.objects.get\\(username=''khan''\\)\nprofile = user.profile\n\nprint\\(''=== User khan ===''\\)\nprint\\(''Assigned locations:'', list\\(profile.assigned_locations.values_list\\(''name'', ''is_store'', ''is_standalone''\\)\\)\\)\n\naccessible = profile.get_accessible_locations\\(\\)\nprint\\(''All accessible:'', list\\(accessible.values_list\\(''name'', ''is_store'', ''is_standalone''\\)\\)\\)\n\nstandalone = accessible.filter\\(is_standalone=True\\)\nprint\\(''Standalone only:'', list\\(standalone.values_list\\(''name'', flat=True\\)\\)\\)\n\n# Check location hierarchy\nprint\\(\\)\nprint\\(''=== Location hierarchy ===''\\)\ncsit = Location.objects.filter\\(name=''CSIT''\\).first\\(\\)\nif csit:\n    print\\(f''CSIT parent: {csit.parent_location}''\\)\n    print\\(f''CSIT is_standalone: {csit.is_standalone}''\\)\n    \nmain_uni = Location.objects.filter\\(name__icontains=''main uni''\\).first\\(\\)\nif main_uni:\n    print\\(f''Main Uni: {main_uni.name}, is_standalone: {main_uni.is_standalone}, parent: {main_uni.parent_location}''\\)\n\")"
     ]
+  },
+  "enabledPlugins": {
+    "code-review@claude-code-plugins": true,
+    "figma@claude-plugins-official": true
   }
 }

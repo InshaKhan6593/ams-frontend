@@ -462,18 +462,8 @@ const RequestDetails = () => {
         <div className="space-y-2">
           {/* Info banner for dispatched/completed requests */}
           {(request?.status === 'DISPATCHED' || request?.status === 'PARTIALLY_DISPATCHED') && (
-            <div className="bg-purple-50 border border-purple-300 text-purple-800 px-3 py-2 rounded-lg text-xs">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold mb-1">Items Dispatched - Acknowledge in Acknowledgments Section</p>
-                  <p className="text-purple-700">
-                    Stock entries have been created for the dispatched items. Please go to the
-                    <strong> Acknowledgments</strong> section to accept or reject the received items.
-                    This request will automatically be marked as complete once all items are acknowledged.
-                  </p>
-                </div>
-              </div>
+            <div className="bg-purple-50 border border-purple-200 text-purple-700 px-2 py-1.5 rounded-lg text-xs">
+              <strong>📦 Dispatched:</strong> Items sent. Go to <strong>Acknowledgments</strong> to accept/reject.
             </div>
           )}
 

@@ -1,8 +1,73 @@
 // src/utils/permissions.js
 /**
  * Utility functions for checking centralized control permissions
- * Matches backend logic for ROOT-only access to category/item creation
+ * Updated to support both Django Groups/Permissions and legacy role system
+ *
+ * Priority:
+ * 1. is_superuser (always has full access)
+ * 2. Permission-based checks from permissions object
+ * 3. Legacy role-based checks (for backwards compatibility)
  */
+
+/**
+ * Check if user is a superuser
+ * @param {Object} user - User object from AuthContext
+ * @param {Object} permissions - Permissions object from AuthContext
+ * @returns {boolean}
+ */
+const isSuperuser = (user, permissions) => {
+  return user?.is_superuser === true || permissions?.is_superuser === true;
+};
+
+/**
+ * Check if user has a specific role (supports both legacy and groups)
+ * @param {Object} user - User object
+ * @param {Object} permissions - Permissions object
+ * @param {string} role - Role to check
+ * @returns {boolean}
+ */
+const hasRole = (user, permissions, role) => {
+  // Check superuser for SYSTEM_ADMIN
+  if (role === 'SYSTEM_ADMIN' && isSuperuser(user, permissions)) {
+    return true;
+  }
+
+  // Check legacy role field
+  if (user?.role === role || permissions?.role === role) {
+    return true;
+  }
+
+  // Check Django Groups
+  const roleToGroupMap = {
+    'SYSTEM_ADMIN': 'System Admin',
+    'LOCATION_HEAD': 'Location Head',
+    'STOCK_INCHARGE': 'Stock Incharge',
+    'AUDITOR': 'Auditor',
+  };
+
+  const groupName = roleToGroupMap[role];
+  if (groupName && permissions?.groups?.includes(groupName)) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Check if user has a Django permission
+ * @param {Object} permissions - Permissions object
+ * @param {string} permCodename - Permission codename (e.g., 'add_category', 'manage_categories')
+ * @returns {boolean}
+ */
+const hasDjangoPermission = (permissions, permCodename) => {
+  if (!permissions?.django_permissions) return false;
+  // Check both formats: 'inventory.add_category' and 'add_category'
+  return permissions.django_permissions.some(p =>
+    p === permCodename ||
+    p === `inventory.${permCodename}` ||
+    p.endsWith(`.${permCodename}`)
+  );
+};
 
 /**
  * Check if user can create categories or items
@@ -13,48 +78,41 @@
  * @returns {boolean}
  */
 export const canCreateCategoriesOrItems = (user, permissions) => {
-  // 1. SYSTEM_ADMIN can always create
-  if (user?.role === 'SYSTEM_ADMIN') {
+  // 1. Superuser can always create
+  if (isSuperuser(user, permissions)) {
     return true;
   }
 
-  // 2. Check if user has custom permission
+  // 2. Check if user has custom permission flag
   if (permissions?.can_create_items) {
     return true;
   }
 
-  // 3. Check if user is ROOT Location Head
-  // ROOT locations have no parent (stored in assigned_locations or accessible_locations)
-  if (user?.role === 'LOCATION_HEAD') {
-    // Check if user has any standalone root locations in assigned_locations
-    const assignedLocations = user?.assigned_locations || [];
-    const accessibleLocations = user?.accessible_locations || [];
+  // 3. Check for Django permissions (add_category, manage_categories, add_item)
+  if (hasDjangoPermission(permissions, 'add_category') ||
+      hasDjangoPermission(permissions, 'manage_categories') ||
+      hasDjangoPermission(permissions, 'add_item')) {
+    return true;
+  }
 
-    // Look for root locations in assigned locations (locations without parent)
-    // In backend, root locations have parent_location=null and is_standalone=true
-    // Frontend may not have full location objects, so we check responsible_location
-    const responsibleLocation = user?.responsible_location;
-
-    if (responsibleLocation) {
-      // If user is assigned to a root location (no parent_location)
-      // Backend sends this in permissions.responsible_location
-      if (permissions?.responsible_location && !permissions.responsible_location.parent_location) {
-        return true;
-      }
+  // 4. Check if user is ROOT Location Head
+  if (hasRole(user, permissions, 'LOCATION_HEAD')) {
+    // Check if assigned to a root location (no parent_location)
+    const responsibleLocation = permissions?.responsible_location;
+    if (responsibleLocation && !responsibleLocation.parent_location) {
+      return true;
     }
 
-    // Fallback: check if accessible_standalone_count exists and responsible location is root
-    // This indicates user is ROOT location head
+    // Check accessible_standalone_count
     if (user?.accessible_standalone_count > 0 &&
-        permissions?.responsible_location?.is_standalone &&
-        !permissions?.responsible_location?.parent_location) {
+        responsibleLocation?.is_standalone &&
+        !responsibleLocation?.parent_location) {
       return true;
     }
   }
 
-  // 4. Check if user is ROOT Main Store Incharge
-  if (user?.role === 'STOCK_INCHARGE') {
-    // Backend sends is_main_store_incharge flag in permissions
+  // 5. Check if user is ROOT Main Store Incharge
+  if (hasRole(user, permissions, 'STOCK_INCHARGE')) {
     if (permissions?.is_main_store_incharge === true) {
       return true;
     }
@@ -73,13 +131,20 @@ export const canCreateCategoriesOrItems = (user, permissions) => {
  * @returns {boolean}
  */
 export const canEditCategoriesOrItems = (user, permissions) => {
-  // SYSTEM_ADMIN can always edit
-  if (user?.role === 'SYSTEM_ADMIN') {
+  // Superuser can always edit
+  if (isSuperuser(user, permissions)) {
     return true;
   }
 
   // Check custom permission
   if (permissions?.can_edit_items) {
+    return true;
+  }
+
+  // Check for Django permissions (change_category, manage_categories, change_item)
+  if (hasDjangoPermission(permissions, 'change_category') ||
+      hasDjangoPermission(permissions, 'manage_categories') ||
+      hasDjangoPermission(permissions, 'change_item')) {
     return true;
   }
 
@@ -89,36 +154,54 @@ export const canEditCategoriesOrItems = (user, permissions) => {
 
 /**
  * Check if user can delete categories or items
- * Only SYSTEM_ADMIN can delete
+ * Only superusers or users with delete permission
  *
  * @param {Object} user - User object from AuthContext
+ * @param {Object} permissions - Permissions object from AuthContext
  * @returns {boolean}
  */
-export const canDeleteCategoriesOrItems = (user) => {
-  return user?.role === 'SYSTEM_ADMIN';
+export const canDeleteCategoriesOrItems = (user, permissions) => {
+  if (isSuperuser(user, permissions)) {
+    return true;
+  }
+
+  // Check for Django delete permissions
+  if (hasDjangoPermission(permissions, 'delete_category') ||
+      hasDjangoPermission(permissions, 'delete_item')) {
+    return true;
+  }
+
+  return false;
 };
 
 /**
  * Get user-friendly message explaining why user can't create categories/items
  *
  * @param {Object} user - User object from AuthContext
+ * @param {Object} permissions - Permissions object from AuthContext
  * @returns {string}
  */
-export const getCannotCreateMessage = (user) => {
+export const getCannotCreateMessage = (user, permissions) => {
   if (!user) {
     return 'You must be logged in to create categories or items.';
   }
 
-  switch (user.role) {
-    case 'LOCATION_HEAD':
-      return 'Only ROOT Location Heads can create categories and items. Department heads cannot create master catalog entries. Contact your university admin.';
-    case 'STOCK_INCHARGE':
-      return 'Only ROOT Main Store Incharges can create categories and items. Department store incharges cannot create master catalog entries. Contact your central admin.';
-    case 'AUDITOR':
-      return 'Auditors have read-only access. Contact your admin to request custom permissions if needed.';
-    default:
-      return 'You do not have permission to create categories or items. Contact your administrator.';
+  const role = user.role || permissions?.role;
+  const groups = permissions?.groups || [];
+
+  if (hasRole(user, permissions, 'LOCATION_HEAD') || groups.includes('Location Head')) {
+    return 'Only ROOT Location Heads can create categories and items. Department heads cannot create master catalog entries. Contact your university admin.';
   }
+
+  if (hasRole(user, permissions, 'STOCK_INCHARGE') || groups.includes('Stock Incharge')) {
+    return 'Only ROOT Main Store Incharges can create categories and items. Department store incharges cannot create master catalog entries. Contact your central admin.';
+  }
+
+  if (hasRole(user, permissions, 'AUDITOR') || groups.includes('Auditor')) {
+    return 'Auditors have read-only access. Contact your admin to request custom permissions if needed.';
+  }
+
+  return 'You do not have permission to create categories or items. Contact your administrator.';
 };
 
 /**
@@ -129,21 +212,64 @@ export const getCannotCreateMessage = (user) => {
  * @returns {Object} - { isRoot: boolean, type: string }
  */
 export const isRootUser = (user, permissions) => {
-  if (user?.role === 'SYSTEM_ADMIN') {
-    return { isRoot: true, type: 'SYSTEM_ADMIN' };
+  if (isSuperuser(user, permissions)) {
+    return { isRoot: true, type: 'SUPERUSER' };
   }
 
-  if (user?.role === 'LOCATION_HEAD') {
-    if (permissions?.responsible_location && !permissions.responsible_location.parent_location) {
+  if (hasRole(user, permissions, 'LOCATION_HEAD')) {
+    const responsibleLocation = permissions?.responsible_location;
+    if (responsibleLocation && !responsibleLocation.parent_location) {
       return { isRoot: true, type: 'ROOT_LOCATION_HEAD' };
     }
   }
 
-  if (user?.role === 'STOCK_INCHARGE') {
+  if (hasRole(user, permissions, 'STOCK_INCHARGE')) {
     if (permissions?.is_main_store_incharge === true) {
       return { isRoot: true, type: 'ROOT_MAIN_STORE_INCHARGE' };
     }
   }
 
   return { isRoot: false, type: null };
+};
+
+/**
+ * Get display name for user's role(s)
+ * @param {Object} user - User object
+ * @param {Object} permissions - Permissions object
+ * @returns {string}
+ */
+export const getRoleDisplayName = (user, permissions) => {
+  if (isSuperuser(user, permissions)) {
+    return 'System Admin';
+  }
+
+  // Check groups first
+  const groups = permissions?.groups || [];
+  if (groups.length > 0) {
+    return groups.join(', ');
+  }
+
+  // Fall back to legacy role
+  const roleMap = {
+    'SYSTEM_ADMIN': 'System Admin',
+    'LOCATION_HEAD': 'Location Head',
+    'STOCK_INCHARGE': 'Stock Incharge',
+    'AUDITOR': 'Auditor',
+  };
+
+  const role = user?.role || permissions?.role;
+  return roleMap[role] || permissions?.role_display || 'No Role';
+};
+
+/**
+ * Check if user has a specific permission
+ * @param {Object} permissions - Permissions object
+ * @param {string} permKey - Permission key
+ * @returns {boolean}
+ */
+export const hasPermission = (permissions, permKey) => {
+  if (permissions?.is_superuser) {
+    return true;
+  }
+  return permissions?.[permKey] === true;
 };

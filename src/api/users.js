@@ -84,46 +84,129 @@ export const usersAPI = {
     return response.data;
   },
 
-  // Get role options
+  /**
+   * Get available Django Groups from backend
+   * Falls back to base roles if API fails
+   */
+  getGroups: async () => {
+    try {
+      const response = await apiClient.get('/users/groups/');
+      return response.data;
+    } catch (error) {
+      // Fallback to base roles if endpoint doesn't exist
+      console.warn('Groups endpoint not available, using base roles');
+      return usersAPI.getRoles();
+    }
+  },
+
+  /**
+   * Get role options - base roles that can be assigned to users
+   * These map to Django Groups on the backend
+   * @returns {Array} Array of role options with value and label
+   */
   getRoles: () => {
     return [
-      { value: 'SYSTEM_ADMIN', label: 'System Admin' },
-      { value: 'LOCATION_HEAD', label: 'Location Head' },
-      { value: 'STOCK_INCHARGE', label: 'Stock Incharge' },
-      { value: 'AUDITOR', label: 'Auditor' },
+      { value: 'SYSTEM_ADMIN', label: 'System Admin', description: 'Full system access' },
+      { value: 'LOCATION_HEAD', label: 'Location Head', description: 'Manages standalone locations' },
+      { value: 'STOCK_INCHARGE', label: 'Stock Incharge', description: 'Manages store inventory' },
+      { value: 'AUDITOR', label: 'Auditor', description: 'Reviews and audits certificates' },
     ];
+  },
+
+  /**
+   * Get all role options including both base roles and the option for custom-role-only users
+   * @returns {Array} Array of role options
+   */
+  getAllRoleOptions: () => {
+    return [
+      { value: '', label: 'Custom Role Only', description: 'No base role - assign custom roles', isCustomOnly: true },
+      ...usersAPI.getRoles(),
+    ];
+  },
+
+  /**
+   * Assign user to a Django Group
+   * @param {number} userId - User ID
+   * @param {string} groupName - Group name to assign
+   */
+  assignGroup: async (userId, groupName) => {
+    const response = await apiClient.post(`/users/${userId}/assign_group/`, {
+      group_name: groupName
+    });
+    return response.data;
+  },
+
+  /**
+   * Remove user from a Django Group
+   * @param {number} userId - User ID
+   * @param {string} groupName - Group name to remove
+   */
+  removeGroup: async (userId, groupName) => {
+    const response = await apiClient.post(`/users/${userId}/remove_group/`, {
+      group_name: groupName
+    });
+    return response.data;
+  },
+
+  /**
+   * Get available Django permissions for assignment
+   * Returns permissions grouped by category
+   */
+  getAvailablePermissions: async () => {
+    const response = await apiClient.get('/users/available_permissions/');
+    return response.data;
+  },
+
+  /**
+   * Assign Django permissions to a user
+   * @param {number} userId - User ID
+   * @param {string[]} permissions - Array of permission codenames
+   * @param {boolean} replace - If true, replace all existing permissions
+   */
+  assignPermissions: async (userId, permissions, replace = false) => {
+    const response = await apiClient.post(`/users/${userId}/assign_permissions/`, {
+      permissions,
+      replace
+    });
+    return response.data;
+  },
+
+  /**
+   * Get user's current Django permissions
+   * @param {number} userId - User ID
+   */
+  getUserPermissions: async (userId) => {
+    const response = await apiClient.get(`/users/${userId}/`);
+    return {
+      django_permissions: response.data.django_permissions || [],
+      groups: response.data.permissions_summary?.groups || []
+    };
   },
 };
 
-// Custom Roles API
-export const customRolesAPI = {
-  // Get all custom roles
-  getAll: async (params = {}) => {
-    const response = await apiClient.get('/custom-roles/', { params });
-    return response.data;
+// NOTE: CustomRoles API removed - now using Django Groups/Permissions
+// Use groupsAPI for managing user groups
+
+// Groups API (for Django Groups management)
+export const groupsAPI = {
+  // Get all available groups
+  getAll: async () => {
+    try {
+      const response = await apiClient.get('/groups/');
+      return response.data;
+    } catch (error) {
+      // Fallback to hardcoded groups
+      return [
+        { id: 1, name: 'Location Head' },
+        { id: 2, name: 'Stock Incharge' },
+        { id: 3, name: 'Auditor' },
+      ];
+    }
   },
 
-  // Get single custom role
+  // Get group details
   get: async (id) => {
-    const response = await apiClient.get(`/custom-roles/${id}/`);
-    return response.data;
-  },
-
-  // Create custom role
-  create: async (roleData) => {
-    const response = await apiClient.post('/custom-roles/', roleData);
-    return response.data;
-  },
-
-  // Update custom role
-  update: async (id, roleData) => {
-    const response = await apiClient.put(`/custom-roles/${id}/`, roleData);
-    return response.data;
-  },
-
-  // Delete custom role
-  delete: async (id) => {
-    const response = await apiClient.delete(`/custom-roles/${id}/`);
+    const response = await apiClient.get(`/groups/${id}/`);
     return response.data;
   },
 };

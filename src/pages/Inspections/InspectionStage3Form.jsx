@@ -1004,6 +1004,16 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
       setSuccess(`Sub-category "${response.name}" created successfully!`);
       setShowCreateSubCategoryModal(false);
       await fetchAllCategories();
+
+      // Auto-select the newly created subcategory
+      if (response.id) {
+        setFormData(prev => ({ ...prev, category: response.id.toString() }));
+        const parentCat = allCategories.find(c => c.id === response.parent_category);
+        const displayName = `${response.name} (${response.tracking_type || parentCat?.tracking_type || 'N/A'})`;
+        setCategorySearchQuery(displayName);
+        setSelectedCategoryTrackingType(response.tracking_type || response.inherited_tracking_type || parentCat?.tracking_type);
+      }
+
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       const errorMessage = err.response?.data?.error || err.response?.data?.detail || err.message || 'Failed to create sub-category';
@@ -1210,13 +1220,10 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
                     </div>
 
                     {showCategoryDropdown && (
-                      <div 
-                        className={`absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${
-                          subCategories.length >= 6 ? 'max-h-48 overflow-y-auto' : ''
-                        }`}
-                        style={{ maxHeight: subCategories.length >= 6 ? '12rem' : 'auto' }}
+                      <div
+                        className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto scrollbar-thin"
                       >
-                        {subCategories.filter(cat => 
+                        {subCategories.filter(cat =>
                           cat.displayName.toLowerCase().includes(categorySearchQuery.toLowerCase())
                         ).map(cat => (
                           <div
@@ -1231,22 +1238,22 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
                                 setSelectedCategoryTrackingType(trackingType);
                               }
                             }}
-                            className={`p-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                            className={`px-2 py-1.5 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
                               formData.category === cat.id.toString() ? 'bg-blue-50' : ''
                             }`}
                           >
-                            <span className="text-gray-700 font-normal">
+                            <span className="text-xs text-gray-700">
                               {cat.name}
                             </span>
-                            <span className="text-xs text-gray-500 ml-2">
+                            <span className="text-xs text-gray-400 ml-1">
                               ({cat.parentName})
                             </span>
                           </div>
                         ))}
-                        {subCategories.filter(cat => 
+                        {subCategories.filter(cat =>
                           cat.displayName.toLowerCase().includes(categorySearchQuery.toLowerCase())
                         ).length === 0 && (
-                          <div className="p-2 text-xs text-gray-500 text-center">
+                          <div className="px-2 py-1.5 text-xs text-gray-500 text-center">
                             No sub-categories found
                           </div>
                         )}
@@ -1325,13 +1332,10 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
                 </div>
 
                 {showAcctUnitDropdown && (
-                  <div 
-                    className={`absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${
-                      ACCOUNTING_UNITS.length >= 6 ? 'max-h-48 overflow-y-auto' : ''
-                    }`}
-                    style={{ maxHeight: ACCOUNTING_UNITS.length >= 6 ? '12rem' : 'auto' }}
+                  <div
+                    className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto scrollbar-thin"
                   >
-                    {ACCOUNTING_UNITS.filter(unit => 
+                    {ACCOUNTING_UNITS.filter(unit =>
                       unit.label.toLowerCase().includes(acctUnitSearchQuery.toLowerCase())
                     ).map(unit => (
                       <div
@@ -1341,19 +1345,19 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
                           setAcctUnitSearchQuery(unit.label);
                           setShowAcctUnitDropdown(false);
                         }}
-                        className={`p-2 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                        className={`px-2 py-1.5 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
                           formData.acct_unit === unit.value ? 'bg-blue-50' : ''
                         }`}
                       >
-                        <span className="text-gray-700 font-normal text-xs">
+                        <span className="text-xs text-gray-700">
                           {unit.label}
                         </span>
                       </div>
                     ))}
-                    {ACCOUNTING_UNITS.filter(unit => 
+                    {ACCOUNTING_UNITS.filter(unit =>
                       unit.label.toLowerCase().includes(acctUnitSearchQuery.toLowerCase())
                     ).length === 0 && (
-                      <div className="p-2 text-xs text-gray-500 text-center">
+                      <div className="px-2 py-1.5 text-xs text-gray-500 text-center">
                         No units found
                       </div>
                     )}

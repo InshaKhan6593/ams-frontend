@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { Plus, Search, Package, Edit, Trash2, Box, Tag, TrendingUp, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useItems } from '../../hooks/queries';
-import { useDebounce } from '../../utils/debounce';
 import { SkeletonList } from '../../components/common/Skeleton';
 import { itemsAPI } from '../../api/items';
 import {
@@ -24,20 +23,8 @@ const ItemsList = () => {
   const [trackingFilter, setTrackingFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Debounce search to reduce API calls
-  const debouncedSearch = useDebounce(searchTerm, 500);
-
-  // Build query params
-  const queryParams = useMemo(() => {
-    const params = {};
-    if (debouncedSearch) params.search = debouncedSearch;
-    if (categoryFilter) params.category = categoryFilter;
-    if (trackingFilter) params.tracking_type = trackingFilter;
-    return params;
-  }, [debouncedSearch, categoryFilter, trackingFilter]);
-
-  // Fetch items with React Query (automatic caching)
-  const { data: items = [], isLoading: loading, error, refetch } = useItems(queryParams);
+  // Fetch all items once - filtering is done client-side
+  const { data: items = [], isLoading: loading, error, refetch } = useItems({});
 
   // Extract unique categories from items
   const categories = useMemo(() => {
@@ -218,13 +205,13 @@ const ItemsList = () => {
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-2">
+      <form onSubmit={(e) => e.preventDefault()} className="bg-white rounded-lg border border-gray-200 p-2">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           {/* Search */}
           <div className="relative md:col-span-2">
             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
-              type="text"
+              type="search"
               placeholder="Search items..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -277,30 +264,30 @@ const ItemsList = () => {
             {searchTerm && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
                 Search: {searchTerm}
-                <button onClick={() => setSearchTerm('')} className="hover:text-blue-900">×</button>
+                <button type="button" onClick={() => setSearchTerm('')} className="hover:text-blue-900">×</button>
               </span>
             )}
             {categoryFilter && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">
                 Category: {categories.find(c => c.id === parseInt(categoryFilter))?.name}
-                <button onClick={() => setCategoryFilter('')} className="hover:text-purple-900">×</button>
+                <button type="button" onClick={() => setCategoryFilter('')} className="hover:text-purple-900">×</button>
               </span>
             )}
             {trackingFilter && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
                 Tracking: {trackingFilter}
-                <button onClick={() => setTrackingFilter('')} className="hover:text-green-900">×</button>
+                <button type="button" onClick={() => setTrackingFilter('')} className="hover:text-green-900">×</button>
               </span>
             )}
             {statusFilter !== 'all' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded">
                 Status: {statusFilter}
-                <button onClick={() => setStatusFilter('all')} className="hover:text-orange-900">×</button>
+                <button type="button" onClick={() => setStatusFilter('all')} className="hover:text-orange-900">×</button>
               </span>
             )}
           </div>
         )}
-      </div>
+      </form>
 
       {/* Items Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

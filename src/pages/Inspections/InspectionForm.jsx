@@ -6,6 +6,7 @@ import { ArrowLeft, Save, Send, CheckCircle, XCircle } from 'lucide-react';
 import { inspectionsAPI } from '../../api/inspections';
 import { locationsAPI } from '../../api/locations';
 import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import InspectionWorkflowProgress from './InspectionWorkflowProgress';
 import InspectionStage1Form from './InspectionStage1Form';
@@ -14,10 +15,70 @@ import InspectionStage3Form from './InspectionStage3Form';
 import InspectionStage4Form from './InspectionStage4Form';
 import { inspectionsKeys } from '../../hooks/queries/useInspections';
 
+// Helper function to extract readable error messages from API responses
+const extractErrorMessage = (err) => {
+  const data = err.response?.data;
+
+  if (!data) {
+    return err.message || 'An unexpected error occurred';
+  }
+
+  // If it's a string, return directly
+  if (typeof data === 'string') {
+    return data;
+  }
+
+  // Check for common error fields first
+  if (data.error) return data.error;
+  if (data.detail) return data.detail;
+  if (data.message) return data.message;
+
+  // Handle field-specific validation errors (DRF format)
+  // e.g., {"contract_no": ["This field is required."], "contractor_name": ["Enter a valid value."]}
+  const fieldErrors = [];
+  const fieldLabelMap = {
+    contract_no: 'Contract No',
+    contract_date: 'Contract Date',
+    contractor_name: 'Contractor Name',
+    contractor_address: 'Contractor Address',
+    consignee_name: 'Consignee Name',
+    consignee_designation: 'Consignee Designation',
+    indenter: 'Indenter',
+    indent_no: 'Indent No',
+    date: 'Certificate Date',
+    department: 'Department',
+    date_of_delivery: 'Delivery Date',
+    delivery_type: 'Delivery Type',
+    inspected_by: 'Inspected By',
+    date_of_inspection: 'Inspection Date',
+    remarks: 'Remarks',
+    non_field_errors: 'Error',
+  };
+
+  for (const [field, errors] of Object.entries(data)) {
+    if (Array.isArray(errors)) {
+      const label = fieldLabelMap[field] || field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      errors.forEach(msg => {
+        fieldErrors.push(`${label}: ${msg}`);
+      });
+    } else if (typeof errors === 'string') {
+      const label = fieldLabelMap[field] || field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      fieldErrors.push(`${label}: ${errors}`);
+    }
+  }
+
+  if (fieldErrors.length > 0) {
+    return fieldErrors.join('\n');
+  }
+
+  return 'Failed to save. Please check your input and try again.';
+};
+
 const InspectionForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user: currentUser } = useAuth();
+  const { isStockIncharge: checkIsStockIncharge, isCentralStoreIncharge: checkIsCentralStoreIncharge, hasPermission } = usePermissions();
   const queryClient = useQueryClient();
   const isEditMode = Boolean(id);
 
@@ -158,10 +219,7 @@ const InspectionForm = () => {
       }
     } catch (err) {
       console.error('Error saving inspection:', err);
-      const errorMessage = err.response?.data?.error ||
-                          err.response?.data?.detail ||
-                          'Failed to save inspection certificate';
-      setError(errorMessage);
+      setError(extractErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -338,9 +396,8 @@ const InspectionForm = () => {
 
         setError(errorMessage);
       } else {
-        const errorMessage = err.response?.data?.detail ||
-                            'Failed to submit certificate';
-        setError(errorMessage);
+        // Use the helper for field-specific validation errors
+        setError(extractErrorMessage(err));
       }
     } finally {
       setSubmitting(false);
@@ -382,10 +439,7 @@ const InspectionForm = () => {
       }, 2000);
     } catch (err) {
       console.error('Error rejecting certificate:', err);
-      const errorMessage = err.response?.data?.error ||
-                          err.response?.data?.detail ||
-                          'Failed to reject certificate';
-      setError(errorMessage);
+      setError(extractErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -417,18 +471,27 @@ const InspectionForm = () => {
   const currentStage = inspection.stage;
   const isRejected = currentStage === 'REJECTED';
   const isCompleted = currentStage === 'COMPLETED';
-  
+
   // FIX: Override isReadOnly for STOCK_DETAILS stage
   // Force editable for Stock Incharge in STOCK_DETAILS stage
-  const isStockIncharge = currentUser?.profile?.role === 'STOCK_INCHARGE';
+  // Uses new permission hook that supports both legacy roles and Django Groups
+  const isStockIncharge = checkIsStockIncharge() || hasPermission('can_fill_stock_details');
   const isStockDetailsStage = currentStage === 'STOCK_DETAILS';
 
-  
-  
+  // FIX: Override isReadOnly for CENTRAL_REGISTER stage
+  // Force editable for Central Store Incharge in CENTRAL_REGISTER stage
+  const isCentralStoreInchargeUser = checkIsCentralStoreIncharge() || hasPermission('can_fill_central_register');
+  const isCentralRegisterStage = currentStage === 'CENTRAL_REGISTER';
+
   let isReadOnly = !canEdit || isRejected || isCompleted;
-  
+
   // Override: Stock Incharge can always edit in STOCK_DETAILS stage
   if (isStockDetailsStage && isStockIncharge) {
+    isReadOnly = false;
+  }
+
+  // Override: Central Store Incharge can always edit in CENTRAL_REGISTER stage
+  if (isCentralRegisterStage && isCentralStoreInchargeUser) {
     isReadOnly = false;
   }
 
@@ -554,8 +617,8 @@ const InspectionForm = () => {
                 Cancel
               </button>
               
-              {/* Save button - show for edit mode OR for Stock Incharge in STOCK_DETAILS */}
-              {(isEditMode && canEdit) || (isStockDetailsStage && isStockIncharge) ? (
+              {/* Save button - show for edit mode OR for Stock Incharge in STOCK_DETAILS OR Central Store Incharge in CENTRAL_REGISTER */}
+              {(isEditMode && canEdit) || (isStockDetailsStage && isStockIncharge) || (isCentralRegisterStage && isCentralStoreInchargeUser) ? (
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -568,9 +631,9 @@ const InspectionForm = () => {
                   {saving ? 'Saving...' : 'Save'}
                 </button>
               ) : null}
-              
-              {/* Submit button - show if canSubmit OR if Stock Incharge in STOCK_DETAILS */}
-              {canSubmit || (isStockDetailsStage && isStockIncharge) ? (
+
+              {/* Submit button - show if canSubmit OR if Stock Incharge in STOCK_DETAILS OR Central Store Incharge in CENTRAL_REGISTER */}
+              {canSubmit || (isStockDetailsStage && isStockIncharge) || (isCentralRegisterStage && isCentralStoreInchargeUser) ? (
                 <button
                   onClick={handleSubmitStage}
                   disabled={submitting}
