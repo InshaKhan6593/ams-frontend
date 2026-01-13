@@ -25,6 +25,7 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
   const [batchTrackingDetails, setBatchTrackingDetails] = useState({});
   const [individualTrackingDetails, setIndividualTrackingDetails] = useState({});
   const [bulkTrackingDetails, setBulkTrackingDetails] = useState({});
+  const [itemStockSettings, setItemStockSettings] = useState({});
 
   const canEdit = !isReadOnly;
 
@@ -79,40 +80,39 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
     searchItems(query);
   };
 
-  const handleSelectItemForLinking = async (item) => {
-    // If tracking_type is not present, fetch full item details
-    if (!item.tracking_type) {
-      try {
-        const fullItem = await itemsAPI.get(item.id);
-        setSelectedItem(fullItem);
+  const handleSelectItemForLinking = async (item, inspectionItemId) => {
+    // Always fetch full item details to get stock settings
+    try {
+      const fullItem = await itemsAPI.get(item.id);
+      setSelectedItem(fullItem);
 
-        // Reset tracking details for types that don't match
-        if (fullItem.tracking_type !== 'BATCH') {
-          setBatchTrackingDetails({});
+      // Populate stock settings for this inspection item
+      setItemStockSettings(prev => ({
+        ...prev,
+        [inspectionItemId]: {
+          minimum_stock_alert: fullItem.minimum_stock_alert || 0,
+          reorder_level: fullItem.reorder_level || 0,
+          reorder_quantity: fullItem.reorder_quantity || 0,
+          requires_expiry_tracking: fullItem.requires_expiry_tracking || false,
+          shelf_life_days: fullItem.shelf_life_days || '',
+          requires_maintenance: fullItem.requires_maintenance || false,
+          maintenance_interval_days: fullItem.maintenance_interval_days || '',
         }
-        if (fullItem.tracking_type !== 'INDIVIDUAL') {
-          setIndividualTrackingDetails({});
-        }
-        if (fullItem.tracking_type !== 'BULK') {
-          setBulkTrackingDetails({});
-        }
-      } catch (err) {
-        console.error('Error fetching item details:', err);
-        setSelectedItem(item); // Fall back to using the search result
-      }
-    } else {
-      setSelectedItem(item);
+      }));
 
       // Reset tracking details for types that don't match
-      if (item.tracking_type !== 'BATCH') {
+      if (fullItem.tracking_type !== 'BATCH') {
         setBatchTrackingDetails({});
       }
-      if (item.tracking_type !== 'INDIVIDUAL') {
+      if (fullItem.tracking_type !== 'INDIVIDUAL') {
         setIndividualTrackingDetails({});
       }
-      if (item.tracking_type !== 'BULK') {
+      if (fullItem.tracking_type !== 'BULK') {
         setBulkTrackingDetails({});
       }
+    } catch (err) {
+      console.error('Error fetching item details:', err);
+      setSelectedItem(item); // Fall back to using the search result
     }
 
     setSearchQuery('');
@@ -159,12 +159,27 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
 
       const response = await inspectionsAPI.linkToExistingItem(inspection.id, payload);
 
+      // Update stock settings if any were provided
+      const stockSettings = itemStockSettings[inspectionItemId];
+      if (stockSettings && Object.keys(stockSettings).length > 0) {
+        try {
+          await inspectionsAPI.updateItemStockSettings(inspection.id, {
+            inspection_item_id: inspectionItemId,
+            ...stockSettings
+          });
+        } catch (settingsErr) {
+          console.error('Error updating stock settings:', settingsErr);
+          // Don't fail the whole operation if settings update fails
+        }
+      }
+
       setSuccess('Item linked successfully! You can now add Central Register details via the Edit button.');
       setSelectedItem(null);
       setExpandedItemId(null);
       setBatchTrackingDetails({});
       setIndividualTrackingDetails({});
       setBulkTrackingDetails({});
+      setItemStockSettings({});
 
       // Update linking summary and unlinked items
       if (response.linking_summary) {
@@ -749,6 +764,179 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
                       </div>
                     )}
 
+                    {/* Stock/Maintenance Settings */}
+                    {selectedItem && (
+                      <div className="bg-gray-50 border border-gray-300 rounded p-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Package className="w-4 h-4 text-gray-700" />
+                          <p className="text-xs font-semibold text-gray-900">Stock Settings</p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Min Stock Alert
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={itemStockSettings[item.id]?.minimum_stock_alert || ''}
+                              onChange={(e) => setItemStockSettings(prev => ({
+                                ...prev,
+                                [item.id]: {
+                                  ...prev[item.id],
+                                  minimum_stock_alert: e.target.value ? parseInt(e.target.value) : 0
+                                }
+                              }))}
+                              placeholder="Min alert level"
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Reorder Level
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={itemStockSettings[item.id]?.reorder_level || ''}
+                              onChange={(e) => setItemStockSettings(prev => ({
+                                ...prev,
+                                [item.id]: {
+                                  ...prev[item.id],
+                                  reorder_level: e.target.value ? parseInt(e.target.value) : 0
+                                }
+                              }))}
+                              placeholder="Reorder at"
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Reorder Quantity
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={itemStockSettings[item.id]?.reorder_quantity || ''}
+                              onChange={(e) => setItemStockSettings(prev => ({
+                                ...prev,
+                                [item.id]: {
+                                  ...prev[item.id],
+                                  reorder_quantity: e.target.value ? parseInt(e.target.value) : 0
+                                }
+                              }))}
+                              placeholder="Order quantity"
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Expiry Tracking - ONLY for BATCH (Perishable) items */}
+                        {selectedItem.tracking_type === 'BATCH' && (
+                          <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={itemStockSettings[item.id]?.requires_expiry_tracking || false}
+                                onChange={(e) => setItemStockSettings(prev => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    ...prev[item.id],
+                                    requires_expiry_tracking: e.target.checked,
+                                    shelf_life_days: e.target.checked ? prev[item.id]?.shelf_life_days || '' : ''
+                                  }
+                                }))}
+                                className="w-3 h-3 text-amber-600"
+                              />
+                              <span className="text-xs font-medium text-amber-900">Requires Expiry Tracking</span>
+                            </label>
+                            {itemStockSettings[item.id]?.requires_expiry_tracking && (
+                              <div className="mt-2">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Shelf Life (Days) <span className="text-red-600">*</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={itemStockSettings[item.id]?.shelf_life_days || ''}
+                                  onChange={(e) => setItemStockSettings(prev => ({
+                                    ...prev,
+                                    [item.id]: {
+                                      ...prev[item.id],
+                                      shelf_life_days: e.target.value ? parseInt(e.target.value) : ''
+                                    }
+                                  }))}
+                                  placeholder="Days until expiry"
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                  required
+                                />
+                              </div>
+                            )}
+                            <p className="text-xs text-amber-700 mt-2">
+                              📦 Perishable item (BATCH tracking)
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Maintenance - ONLY for INDIVIDUAL (Fixed Asset) items */}
+                        {selectedItem.tracking_type === 'INDIVIDUAL' && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={itemStockSettings[item.id]?.requires_maintenance || false}
+                                onChange={(e) => setItemStockSettings(prev => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    ...prev[item.id],
+                                    requires_maintenance: e.target.checked,
+                                    maintenance_interval_days: e.target.checked ? prev[item.id]?.maintenance_interval_days || '' : ''
+                                  }
+                                }))}
+                                className="w-3 h-3 text-blue-600"
+                              />
+                              <span className="text-xs font-medium text-blue-900">Requires Maintenance</span>
+                            </label>
+                            {itemStockSettings[item.id]?.requires_maintenance && (
+                              <div className="mt-2">
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Maintenance Interval (Days) <span className="text-red-600">*</span>
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={itemStockSettings[item.id]?.maintenance_interval_days || ''}
+                                  onChange={(e) => setItemStockSettings(prev => ({
+                                    ...prev,
+                                    [item.id]: {
+                                      ...prev[item.id],
+                                      maintenance_interval_days: e.target.value ? parseInt(e.target.value) : ''
+                                    }
+                                  }))}
+                                  placeholder="Days between maintenance"
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  required
+                                />
+                              </div>
+                            )}
+                            <p className="text-xs text-blue-700 mt-2">
+                              🔖 Fixed asset (INDIVIDUAL tracking)
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Info for BULK (Consumable) items */}
+                        {selectedItem.tracking_type === 'BULK' && (
+                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                            <p className="text-xs text-green-800">
+                              📊 <strong>Consumable item (BULK tracking)</strong><br />
+                              Only stock settings apply.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Search for Existing Items */}
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -823,7 +1011,7 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
                               className="p-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                               onClick={() => {
                                 // Set selectedItem to show tracking-specific fields
-                                handleSelectItemForLinking(result);
+                                handleSelectItemForLinking(result, item.id);
                                 // Note: User will click "Link Item" button after filling fields
                               }}
                             >
@@ -936,13 +1124,20 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
     // Central Register Details
     central_register_no: '',
     central_register_page_no: '',
+    // Stock settings (for ALL item types)
+    minimum_stock_alert: '',
+    reorder_level: '',
+    reorder_quantity: '',
+    requires_expiry_tracking: false,
+    shelf_life_days: '',
+    requires_maintenance: false,
+    maintenance_interval_days: '',
     // Tracking-specific fields
     batch_number: '',
     manufacture_date: '',
     expiry_date: '',
     warranty_months: '',
     minimum_stock_level: '',
-    reorder_level: '',
   });
   const [allCategories, setAllCategories] = useState([]);
   const [hierarchicalCategories, setHierarchicalCategories] = useState([]);
@@ -1064,14 +1259,31 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Clean up form data - remove empty strings and convert them to null for optional fields
+    // Clean up form data - remove empty strings and convert them to proper types
     const cleanedData = { ...formData };
 
-    // Remove tracking-specific numeric fields if they're empty (not relevant to this tracking type)
-    const numericFields = ['warranty_months', 'minimum_stock_level', 'reorder_level'];
+    // Handle all numeric fields - convert strings to integers or remove if empty
+    const numericFields = [
+      'warranty_months',
+      'minimum_stock_level',
+      'minimum_stock_alert',
+      'reorder_level',
+      'reorder_quantity',
+      'shelf_life_days',
+      'maintenance_interval_days'
+    ];
+
     numericFields.forEach(field => {
       if (cleanedData[field] === '' || cleanedData[field] === null || cleanedData[field] === undefined) {
         delete cleanedData[field];
+      } else if (typeof cleanedData[field] === 'string') {
+        // Convert string numbers to integers
+        const num = parseInt(cleanedData[field], 10);
+        if (!isNaN(num)) {
+          cleanedData[field] = num;
+        } else {
+          delete cleanedData[field];
+        }
       }
     });
 
@@ -1085,6 +1297,24 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
         delete cleanedData[field];
       }
     });
+
+    // Handle boolean fields - ensure they're actual booleans, not strings
+    if (typeof cleanedData.requires_expiry_tracking === 'string') {
+      cleanedData.requires_expiry_tracking = cleanedData.requires_expiry_tracking === 'true';
+    }
+    if (typeof cleanedData.requires_maintenance === 'string') {
+      cleanedData.requires_maintenance = cleanedData.requires_maintenance === 'true';
+    }
+
+    // Validate conditional requirements
+    if (cleanedData.requires_expiry_tracking && !cleanedData.shelf_life_days) {
+      setError('Shelf life days is required when expiry tracking is enabled');
+      return;
+    }
+    if (cleanedData.requires_maintenance && !cleanedData.maintenance_interval_days) {
+      setError('Maintenance interval days is required when maintenance is enabled');
+      return;
+    }
 
     onCreate(cleanedData);
   };
@@ -1452,6 +1682,148 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Stock & Maintenance Settings */}
+        <div className="bg-white rounded-lg border border-gray-200 p-2">
+          <h2 className="text-xs font-semibold text-gray-900 mb-2">Stock Settings</h2>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Min Stock Alert
+              </label>
+              <input
+                type="number"
+                name="minimum_stock_alert"
+                value={formData.minimum_stock_alert}
+                onChange={handleChange}
+                min="0"
+                placeholder="Minimum alert level"
+                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p className="text-xs text-gray-500 mt-0.5">Alert when stock is low</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Reorder Level
+              </label>
+              <input
+                type="number"
+                name="reorder_level"
+                value={formData.reorder_level}
+                onChange={handleChange}
+                min="0"
+                placeholder="When to reorder"
+                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p className="text-xs text-gray-500 mt-0.5">Trigger reorder at this level</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Reorder Quantity
+              </label>
+              <input
+                type="number"
+                name="reorder_quantity"
+                value={formData.reorder_quantity}
+                onChange={handleChange}
+                min="0"
+                placeholder="How much to order"
+                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p className="text-xs text-gray-500 mt-0.5">Order this quantity</p>
+            </div>
+          </div>
+
+          {/* Expiry Tracking Toggle - ONLY for BATCH (Perishable) items */}
+          {selectedCategoryTrackingType === 'BATCH' && (
+            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.requires_expiry_tracking}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    requires_expiry_tracking: e.target.checked,
+                    shelf_life_days: e.target.checked ? prev.shelf_life_days : ''
+                  }))}
+                  className="w-3 h-3 text-amber-600"
+                />
+                <span className="text-xs font-medium text-amber-900">Requires Expiry Tracking</span>
+              </label>
+              {formData.requires_expiry_tracking && (
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Shelf Life (Days) <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="shelf_life_days"
+                    value={formData.shelf_life_days}
+                    onChange={handleChange}
+                    min="1"
+                    placeholder="Days until expiry"
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    required={formData.requires_expiry_tracking}
+                  />
+                  <p className="text-xs text-gray-500 mt-0.5">Items expire after this many days</p>
+                </div>
+              )}
+              <p className="text-xs text-amber-700 mt-2">
+                📦 This is a perishable item (BATCH tracking)
+              </p>
+            </div>
+          )}
+
+          {/* Maintenance Toggle - ONLY for INDIVIDUAL (Fixed Asset) items */}
+          {selectedCategoryTrackingType === 'INDIVIDUAL' && (
+            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.requires_maintenance}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    requires_maintenance: e.target.checked,
+                    maintenance_interval_days: e.target.checked ? prev.maintenance_interval_days : ''
+                  }))}
+                  className="w-3 h-3 text-blue-600"
+                />
+                <span className="text-xs font-medium text-blue-900">Requires Regular Maintenance</span>
+              </label>
+              {formData.requires_maintenance && (
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Maintenance Interval (Days) <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="maintenance_interval_days"
+                    value={formData.maintenance_interval_days}
+                    onChange={handleChange}
+                    min="1"
+                    placeholder="Days between maintenance"
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required={formData.requires_maintenance}
+                  />
+                  <p className="text-xs text-gray-500 mt-0.5">Schedule maintenance every X days</p>
+                </div>
+              )}
+              <p className="text-xs text-blue-700 mt-2">
+                🔖 This is a fixed asset (INDIVIDUAL tracking)
+              </p>
+            </div>
+          )}
+
+          {/* Info message for BULK (Consumable) items */}
+          {selectedCategoryTrackingType === 'BULK' && (
+            <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
+              <p className="text-xs text-green-800">
+                📊 <strong>Consumable Item (BULK tracking)</strong><br />
+                Only stock settings apply. No expiry tracking or maintenance required.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 p-2">

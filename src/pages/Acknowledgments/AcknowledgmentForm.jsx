@@ -50,6 +50,12 @@ const AcknowledgmentForm = () => {
         return;
       }
 
+      // Check if user can acknowledge this entry
+      if (!data.can_acknowledge) {
+        setError('You are not authorized to acknowledge this entry. Only the receiving store\'s incharge can acknowledge.');
+        return;
+      }
+
       setStockEntry(data);
       setTrackingType(data.item_tracking_type);
       

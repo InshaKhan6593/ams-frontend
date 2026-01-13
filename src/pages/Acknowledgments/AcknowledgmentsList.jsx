@@ -31,11 +31,14 @@ const AcknowledgmentsList = () => {
     try {
       setLoading(true);
       setError('');
-      const data = await stockEntriesAPI.getAll({ 
+      const data = await stockEntriesAPI.getAll({
         pending_ack: 'true',
         status: 'PENDING_ACK'
       });
-      setEntries(data.results || data);
+      const allEntries = data.results || data;
+      // Filter to only show entries the user can actually acknowledge
+      const acknowledgeableEntries = allEntries.filter(entry => entry.can_acknowledge);
+      setEntries(acknowledgeableEntries);
     } catch (err) {
       setError('Failed to load acknowledgments');
       console.error(err);

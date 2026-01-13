@@ -24,15 +24,20 @@ const ConsumablesInventory = () => {
     const initializeData = async () => {
       try {
         setLoading(true);
-        const locationsData = await locationsAPI.getUserAccessibleLocations();
-        const locationsList = Array.isArray(locationsData) ? locationsData : locationsData.results || [];
+        const response = await locationsAPI.getUserAccessibleLocations();
+        // API returns: { user_role, responsible_location, locations, count }
+        const locationsList = response.locations || [];
         setLocations(locationsList);
 
-        // For Stock Incharge, default to their first assigned store
+        // For Stock Incharge, default to their assigned store (responsible_location)
         if (isStockIncharge() && !isLocationHead() && !isSystemAdmin()) {
-          const stores = locationsList.filter(l => l.is_store);
-          if (stores.length > 0) {
-            setLocationFilter(stores[0].id.toString());
+          if (response.responsible_location) {
+            setLocationFilter(response.responsible_location.id.toString());
+          } else {
+            const stores = locationsList.filter(l => l.is_store);
+            if (stores.length > 0) {
+              setLocationFilter(stores[0].id.toString());
+            }
           }
         }
         setInitialized(true);

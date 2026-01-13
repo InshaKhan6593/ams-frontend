@@ -126,6 +126,12 @@ export const inspectionsAPI = {
     return response.data;
   },
 
+  // Update item stock/maintenance settings during CENTRAL_REGISTER stage
+  updateItemStockSettings: async (id, data) => {
+    const response = await apiClient.post(`/inspection-certificates/${id}/update_item_stock_settings/`, data);
+    return response.data;
+  },
+
   // NEW: Download PDF (only for COMPLETED certificates)
   downloadPDF: async (id) => {
     const response = await apiClient.get(`/inspection-certificates/${id}/download_pdf/`, {

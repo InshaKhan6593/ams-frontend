@@ -60,6 +60,8 @@ const StockEntryForm = () => {
   const [totalAvailable, setTotalAvailable] = useState(0);
   const [reservedQuantity, setReservedQuantity] = useState(0);
   const [totalQuantity, setTotalQuantity] = useState(0);
+  const [inUseQuantity, setInUseQuantity] = useState(0);
+  const [sourceLocationIsStore, setSourceLocationIsStore] = useState(true);
 
   // For searchable item dropdown
   const [itemSearchQuery, setItemSearchQuery] = useState('');
@@ -73,6 +75,14 @@ const StockEntryForm = () => {
       fetchCreationOptions();
     }
   }, [id]);
+
+  // Auto-select location when there's only one option (for RECEIPT entries)
+  useEffect(() => {
+    if (!isEditMode && formData.entry_type === 'RECEIPT' && fromLocations.length === 1 && !formData.to_location) {
+      console.log('[AUTO-SELECT] Setting to_location for RECEIPT entry:', fromLocations[0].id);
+      handleChange('to_location', fromLocations[0].id);
+    }
+  }, [formData.entry_type, fromLocations, isEditMode]);
 
   useEffect(() => {
     // Fetch item stock for both ISSUE and RECEIPT entries
@@ -148,6 +158,10 @@ const StockEntryForm = () => {
       setLoading(true);
       const data = await stockEntriesAPI.getCreationOptions();
 
+      console.log('[CREATION OPTIONS] Data received:', data);
+      console.log('[CREATION OPTIONS] from_locations count:', data.from_locations?.length || 0);
+      console.log('[CREATION OPTIONS] available_items count:', data.available_items?.length || 0);
+
       setFromLocations(data.from_locations || []);
       setInternalTargets(data.internal_targets || []);
       setStandaloneTargets(data.standalone_targets || []);
@@ -156,18 +170,19 @@ const StockEntryForm = () => {
       setCanIssueUpward(data.can_issue_upward || false);
       setUpwardTarget(data.upward_target);
 
+      // Check if user has no locations assigned
+      if (!data.from_locations || data.from_locations.length === 0) {
+        setError('No locations found. Please contact admin to assign you to a store.');
+        return;
+      }
+
       // Auto-populate from_location and to_location with user's default location
-      if (data.default_from_location && !isEditMode) {
+      // Only for ISSUE entries (RECEIPT entries handle location selection differently)
+      if (data.default_from_location && !isEditMode && formData.entry_type === 'ISSUE') {
         setFormData(prev => ({
           ...prev,
           from_location: data.default_from_location.id,
-          to_location: data.default_from_location.id  // For RECEIPT entries
         }));
-
-        // For RECEIPT entries, also fetch receipt source stores
-        if (formData.entry_type === 'RECEIPT') {
-          fetchReceiptSourceStores(data.default_from_location.id);
-        }
       }
 
       // For RECEIPT entries, we'll use fromLocations directly
@@ -182,11 +197,18 @@ const StockEntryForm = () => {
   const fetchReceiptSourceStores = async (receivingStoreId) => {
     try {
       setLoading(true);
+      console.log('[RECEIPT] fetchReceiptSourceStores called with:', receivingStoreId);
+      console.log('[RECEIPT] fromLocations array:', fromLocations);
+
       // Find the receiving store details
       const receivingStore = fromLocations.find(loc => loc.id === parseInt(receivingStoreId));
 
       if (!receivingStore) {
-        console.error('Receiving store not found');
+        console.error('[RECEIPT] ERROR: Receiving store not found in fromLocations');
+        console.error('[RECEIPT] Looking for ID:', receivingStoreId);
+        console.error('[RECEIPT] Available IDs:', fromLocations.map(loc => loc.id));
+        setError('Error: Could not find receiving store details. Please refresh the page.');
+        setLoading(false);
         return;
       }
 
@@ -211,21 +233,37 @@ const StockEntryForm = () => {
       internalSources.push(...internalNonStores);
 
       setReceiptSourceStores(internalSources);
+      console.log('[RECEIPT] Internal sources count:', internalSources.length);
       console.log('[RECEIPT] Internal sources:', internalSources);
 
       // Upward locations: main stores from other standalone locations (only if receiving store is a main store)
+      let upwardStoresCount = 0;
       if (receivingStore.is_main_store) {
+        console.log('[RECEIPT] Receiving store IS a main store, checking for upward stores...');
+        console.log('[RECEIPT] Receiving store parent_location_id:', receivingStore.parent_location_id);
+
         // Get all other standalone locations' main stores
         const upwardStores = fromLocations.filter(loc =>
           loc.is_main_store &&
           loc.parent_location_id !== receivingStore.parent_location_id
         );
+        upwardStoresCount = upwardStores.length;
         setReceiptUpwardStores(upwardStores);
         setReceiptCanReceiveUpward(upwardStores.length > 0);
+        console.log('[RECEIPT] Upward stores count:', upwardStores.length);
         console.log('[RECEIPT] Upward stores:', upwardStores);
       } else {
+        console.log('[RECEIPT] Receiving store is NOT a main store, no upward stores');
         setReceiptUpwardStores([]);
         setReceiptCanReceiveUpward(false);
+      }
+
+      // Final check: if no sources at all, show warning
+      const totalSources = internalSources.length + upwardStoresCount;
+      console.log('[RECEIPT] Total available source locations:', totalSources);
+      if (totalSources === 0) {
+        console.warn('[RECEIPT] WARNING: No source locations available for receipt!');
+        setError('No source locations available for receipt. You may need to use a different entry type or contact your admin.');
       }
     } catch (err) {
       console.error('Failed to fetch receipt source stores:', err);
@@ -253,12 +291,16 @@ const StockEntryForm = () => {
         console.log('Available fields:', {
           available_quantity: data.available_quantity,
           total_quantity: data.total_quantity,
-          reserved_quantity: data.reserved_quantity
+          reserved_quantity: data.reserved_quantity,
+          in_use_quantity: data.in_use_quantity,
+          is_store: data.is_store
         });
 
         // Store the raw quantities for display
         setTotalQuantity(data.total_quantity || 0);
         setReservedQuantity(data.reserved_quantity || 0);
+        setInUseQuantity(data.in_use_quantity || 0);
+        setSourceLocationIsStore(data.is_store !== undefined ? data.is_store : true);
 
         // For BULK items, use available (unreserved) quantity at this location
         // Try multiple field names that backend might use
@@ -335,6 +377,10 @@ const StockEntryForm = () => {
       setReceiptSourceStores([]);
       setReceiptUpwardStores([]);
       setReceiptCanReceiveUpward(false);
+
+      // Log for debugging
+      console.log(`Entry type changed to: ${value}`);
+      console.log(`Available from_locations: ${fromLocations.length}`);
     }
   };
 
@@ -618,9 +664,14 @@ const StockEntryForm = () => {
             <option value="RECEIPT">Receipt (Receive items into store)</option>
           </select>
           {formData.entry_type === 'RECEIPT' && (
-            <p className="text-xs text-blue-600 mt-1 bg-blue-50 p-1.5 rounded">
-              ℹ️ Receipt entries are used to receive items into your store (e.g., from vendors, returns, or external sources)
-            </p>
+            <div className="text-xs text-blue-600 mt-1 bg-blue-50 p-1.5 rounded space-y-1">
+              <p><strong>ℹ️ Receipt Entry Instructions:</strong></p>
+              <ol className="list-decimal ml-4 space-y-0.5">
+                <li>First, select the receiving store (your store)</li>
+                <li>Then, select the source store (where items are coming from)</li>
+                <li>Finally, select the item and quantity</li>
+              </ol>
+            </div>
           )}
           {isEditMode && (
             <p className="text-xs text-gray-500 mt-0.5">Entry type cannot be changed</p>
@@ -1053,20 +1104,31 @@ const StockEntryForm = () => {
               required
             />
             <div className="mt-1 p-1.5 bg-blue-50 border border-blue-200 rounded">
-              <p className="text-xs text-blue-800">
-                <strong>Available to issue:</strong> {totalAvailable} units
-              </p>
-              {reservedQuantity > 0 && (
-                <div className="text-xs text-blue-700 mt-1 pt-1 border-t border-blue-300">
-                  <p>Total at store: {totalQuantity} units</p>
-                  <p>Reserved: {reservedQuantity} units</p>
-                  <p className="font-semibold">Free to issue: {totalAvailable} units</p>
+              {sourceLocationIsStore ? (
+                <>
+                  <p className="text-xs text-blue-800">
+                    <strong>Available to issue:</strong> {totalAvailable} units
+                  </p>
+                  {reservedQuantity > 0 && (
+                    <div className="text-xs text-blue-700 mt-1 pt-1 border-t border-blue-300">
+                      <p>Total at store: {totalQuantity} units</p>
+                      <p>Reserved: {reservedQuantity} units</p>
+                      <p className="font-semibold">Free to issue: {totalAvailable} units</p>
+                    </div>
+                  )}
+                  {reservedQuantity === 0 && totalQuantity > 0 && (
+                    <p className="text-xs text-blue-700 mt-0.5">
+                      Consumable item (tracked in bulk quantity)
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="text-xs text-green-800">
+                  <p className="text-xs font-semibold">📍 Non-Store Location</p>
+                  <p className="text-xs mt-0.5"><strong>In Use:</strong> {inUseQuantity} units</p>
+                  <p className="text-xs"><strong>Available:</strong> {totalAvailable} units</p>
+                  {totalQuantity > inUseQuantity && <p className="text-xs text-green-700 mt-0.5">(Items issued to lab/room/office)</p>}
                 </div>
-              )}
-              {reservedQuantity === 0 && totalQuantity > 0 && (
-                <p className="text-xs text-blue-700 mt-0.5">
-                  Consumable item (tracked in bulk quantity)
-                </p>
               )}
             </div>
           </div>

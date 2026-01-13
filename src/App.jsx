@@ -16,7 +16,8 @@ import ItemForm from './pages/Items/ItemForm';
 import CategoriesList from './pages/Categories/CategoriesList';
 import CategoryForm from './pages/Categories/CategoryForm';
 import { InspectionsList, InspectionForm, InspectionDetails } from './pages/Inspections';
-import { InventoryPage, FixedAssetDistribution, ConsumableDistribution, PerishableDistribution } from './pages/Inventory';
+import { InventoryPage, AllStoresPage, FixedAssetDistribution, ConsumableDistribution, PerishableDistribution } from './pages/Inventory';
+import NonStoreInventory from './pages/Inventory/NonStoreInventory';
 import { StockEntriesList, StockEntryForm, StockEntryDetails } from './pages/StockEntries';
 import { AcknowledgmentsList, AcknowledgmentForm } from './pages/Acknowledgments';
 import { ReturnAcknowledgmentsList, ReturnAcknowledgmentForm } from './pages/Returns';
@@ -135,6 +136,8 @@ function AppRoutes() {
         
         {/* Inventory - Using index.js export */}
         <Route path="inventory" element={<InventoryPage />} />
+        <Route path="inventory/all-stores" element={<AllStoresPage />} />
+        <Route path="inventory/non-stores" element={<NonStoreInventory />} />
         <Route path="inventory/fixed-assets/:itemId/distribution" element={<FixedAssetDistribution />} />
         <Route path="inventory/consumables/:itemId/distribution" element={<ConsumableDistribution />} />
         <Route path="inventory/perishables/:itemId/distribution" element={<PerishableDistribution />} />
