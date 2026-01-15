@@ -24,7 +24,6 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
   const [editedCentralDetails, setEditedCentralDetails] = useState({});
   const [batchTrackingDetails, setBatchTrackingDetails] = useState({});
   const [individualTrackingDetails, setIndividualTrackingDetails] = useState({});
-  const [bulkTrackingDetails, setBulkTrackingDetails] = useState({});
   const [itemStockSettings, setItemStockSettings] = useState({});
 
   const canEdit = !isReadOnly;
@@ -107,9 +106,6 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
       if (fullItem.tracking_type !== 'INDIVIDUAL') {
         setIndividualTrackingDetails({});
       }
-      if (fullItem.tracking_type !== 'BULK') {
-        setBulkTrackingDetails({});
-      }
     } catch (err) {
       console.error('Error fetching item details:', err);
       setSelectedItem(item); // Fall back to using the search result
@@ -148,14 +144,8 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
         payload.warranty_months = individualDetails.warranty_months;
       }
 
-      // Include bulk tracking details if provided (for BULK items)
-      const bulkDetails = bulkTrackingDetails[inspectionItemId] || {};
-      if (bulkDetails.minimum_stock_level) {
-        payload.minimum_stock_level = bulkDetails.minimum_stock_level;
-      }
-      if (bulkDetails.reorder_level) {
-        payload.reorder_level = bulkDetails.reorder_level;
-      }
+      // Note: Stock settings (minimum_stock_alert, reorder_level, reorder_quantity)
+      // are handled separately via itemStockSettings state and updateItemStockSettings API
 
       const response = await inspectionsAPI.linkToExistingItem(inspection.id, payload);
 
@@ -178,7 +168,6 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
       setExpandedItemId(null);
       setBatchTrackingDetails({});
       setIndividualTrackingDetails({});
-      setBulkTrackingDetails({});
       setItemStockSettings({});
 
       // Update linking summary and unlinked items
@@ -244,7 +233,6 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
       setExpandedItemId(null);
       setBatchTrackingDetails({});
       setIndividualTrackingDetails({});
-      setBulkTrackingDetails({});
 
       // Update linking summary
       if (response.linking_summary) {
@@ -359,7 +347,6 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
     if (expandedItemId === itemId) {
       setBatchTrackingDetails({});
       setIndividualTrackingDetails({});
-      setBulkTrackingDetails({});
     }
   };
 
@@ -710,59 +697,12 @@ const InspectionStage3Form = ({ inspection, isReadOnly, onSave, saving, onRefres
                       </div>
                     )}
 
-                    {/* Bulk Tracking Details (only for BULK items - consumables) */}
-                    {selectedItem?.tracking_type === 'BULK' && (
-                      <div className="bg-green-50 border border-green-300 rounded p-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Package className="w-4 h-4 text-green-700" />
-                          <p className="text-xs font-semibold text-green-900">Consumable Stock Details (Optional)</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Minimum Stock Level
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={bulkTrackingDetails[item.id]?.minimum_stock_level || ''}
-                              onChange={(e) => setBulkTrackingDetails(prev => ({
-                                ...prev,
-                                [item.id]: {
-                                  ...prev[item.id],
-                                  minimum_stock_level: e.target.value
-                                }
-                              }))}
-                              placeholder="Minimum quantity threshold"
-                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Reorder Level
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={bulkTrackingDetails[item.id]?.reorder_level || ''}
-                              onChange={(e) => setBulkTrackingDetails(prev => ({
-                                ...prev,
-                                [item.id]: {
-                                  ...prev[item.id],
-                                  reorder_level: e.target.value
-                                }
-                              }))}
-                              placeholder="When to reorder"
-                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                          </div>
-                        </div>
-                        <div className="mt-2 p-2 bg-green-100 rounded text-xs text-green-800 border border-green-300">
-                          <span className="font-semibold">📊 Bulk Item Detected:</span> This item uses <strong>BULK tracking</strong> (consumable).
-                          Quantity tracked in aggregate without individual units.
-                        </div>
-                      </div>
-                    )}
+                    {/* Bulk Tracking Details - REMOVED: Redundant with Stock Settings section below.
+                        Stock Settings section (lines 767-937) already contains:
+                        - Min Stock Alert (same as Minimum Stock Level)
+                        - Reorder Level
+                        - Reorder Quantity
+                        Keeping only the Stock Settings section to avoid duplication. */}
 
                     {/* Stock/Maintenance Settings */}
                     {selectedItem && (
@@ -1137,7 +1077,6 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
     manufacture_date: '',
     expiry_date: '',
     warranty_months: '',
-    minimum_stock_level: '',
   });
   const [allCategories, setAllCategories] = useState([]);
   const [hierarchicalCategories, setHierarchicalCategories] = useState([]);
@@ -1241,7 +1180,34 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+
+      // Auto-calculate expiry_date from manufacture_date + shelf_life_days
+      if (name === 'manufacture_date' || name === 'shelf_life_days') {
+        const manufactureDate = name === 'manufacture_date' ? value : prev.manufacture_date;
+        const shelfLifeDays = name === 'shelf_life_days' ? value : prev.shelf_life_days;
+
+        if (manufactureDate && shelfLifeDays && !isNaN(parseInt(shelfLifeDays))) {
+          try {
+            const mfgDate = new Date(manufactureDate);
+            const shelfDays = parseInt(shelfLifeDays);
+
+            // Calculate expiry date
+            const expiryDate = new Date(mfgDate);
+            expiryDate.setDate(expiryDate.getDate() + shelfDays);
+
+            // Format as YYYY-MM-DD for date input
+            updated.expiry_date = expiryDate.toISOString().split('T')[0];
+          } catch (error) {
+            console.error('Error calculating expiry date:', error);
+          }
+        }
+      }
+
+      return updated;
+    });
 
     // Track selected category's tracking type
     if (name === 'category' && value) {
@@ -1265,7 +1231,6 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
     // Handle all numeric fields - convert strings to integers or remove if empty
     const numericFields = [
       'warranty_months',
-      'minimum_stock_level',
       'minimum_stock_alert',
       'reorder_level',
       'reorder_quantity',
@@ -1911,46 +1876,8 @@ const CreateItemModal = ({ inspectionItem, inspection, onClose, onCreate, loadin
               </>
             )}
 
-            {/* BULK Tracking Fields */}
-            {selectedCategoryTrackingType === 'BULK' && (
-              <>
-                <div className="md:col-span-2">
-                  <div className="bg-green-50 border-2 border-green-300 rounded-lg p-3">
-                    <h4 className="text-xs font-bold text-green-900 mb-2">📊 Consumable Stock Details (Optional)</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Minimum Stock Level
-                        </label>
-                        <input
-                          type="number"
-                          name="minimum_stock_level"
-                          value={formData.minimum_stock_level}
-                          onChange={handleChange}
-                          min="0"
-                          placeholder="Minimum quantity threshold"
-                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Reorder Level
-                        </label>
-                        <input
-                          type="number"
-                          name="reorder_level"
-                          value={formData.reorder_level}
-                          onChange={handleChange}
-                          min="0"
-                          placeholder="When to reorder"
-                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
+            {/* BULK Tracking Fields - Removed redundant fields (minimum_stock_level, reorder_level)
+                These are now only in the generic Stock Settings section above */}
           </div>
         </div>
 
