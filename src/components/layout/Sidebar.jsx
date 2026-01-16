@@ -8,7 +8,6 @@ import {
   BoxIcon,
   BarChart3,
   LogOut,
-  Users,
   MapPin,
   CheckSquare,
   RotateCcw,
@@ -144,12 +143,6 @@ const Sidebar = () => {
       icon: QrCode,
       path: '/dashboard/qr-scanner',
       alwaysShow: true, // QR Scanner available to all
-    },
-    {
-      name: 'Users',
-      icon: Users,
-      path: '/dashboard/users',
-      requiredPermissions: [PERMISSIONS.USERS.VIEW],
     },
     {
       name: 'Administration',

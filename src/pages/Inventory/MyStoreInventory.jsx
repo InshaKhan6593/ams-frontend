@@ -142,10 +142,12 @@ const MyStoreInventory = () => {
       totalQty: acc.totalQty + item.total_quantity,
       available: acc.available + item.available_quantity,
       reserved: acc.reserved + item.reserved_quantity,
+      inTransit: acc.inTransit + (item.in_transit_quantity || 0),
+      inUse: acc.inUse + (item.in_use_quantity || 0),
       lowStock: acc.lowStock + (item.is_low_stock ? 1 : 0),
       outOfStock: acc.outOfStock + (item.available_quantity === 0 ? 1 : 0),
     }),
-    { totalQty: 0, available: 0, reserved: 0, lowStock: 0, outOfStock: 0 }
+    { totalQty: 0, available: 0, reserved: 0, inTransit: 0, inUse: 0, lowStock: 0, outOfStock: 0 }
   );
 
   // Calculate totals for perishables
@@ -153,12 +155,14 @@ const MyStoreInventory = () => {
     (acc, item) => ({
       totalQty: acc.totalQty + item.total_quantity,
       available: acc.available + item.available_quantity,
+      inTransit: acc.inTransit + (item.in_transit_quantity || 0),
+      inUse: acc.inUse + (item.in_use_quantity || 0),
       batches: acc.batches + item.batch_count,
       expired: acc.expired + item.expired_batches,
       nearExpiry: acc.nearExpiry + item.near_expiry_batches,
       fresh: acc.fresh + item.fresh_batches,
     }),
-    { totalQty: 0, available: 0, batches: 0, expired: 0, nearExpiry: 0, fresh: 0 }
+    { totalQty: 0, available: 0, inTransit: 0, inUse: 0, batches: 0, expired: 0, nearExpiry: 0, fresh: 0 }
   );
 
   // Filter items by search term
@@ -569,7 +573,7 @@ const ConsumablesTab = ({ items, totals, onView }) => {
   return (
     <div className="space-y-2">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
         <div className="bg-white rounded-lg border border-gray-200 p-2">
           <p className="text-xs text-gray-500">Items</p>
           <p className="text-lg font-bold text-gray-900">{items.length}</p>
@@ -583,12 +587,20 @@ const ConsumablesTab = ({ items, totals, onView }) => {
           <p className="text-lg font-bold text-green-600">{totals.available}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-2">
-          <p className="text-xs text-gray-500">Low Stock</p>
-          <p className="text-lg font-bold text-amber-600">{totals.lowStock}</p>
+          <p className="text-xs text-gray-500">Reserved</p>
+          <p className="text-lg font-bold text-amber-600">{totals.reserved || 0}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-2">
-          <p className="text-xs text-gray-500">Out of Stock</p>
-          <p className="text-lg font-bold text-red-600">{totals.outOfStock}</p>
+          <p className="text-xs text-gray-500">In Transit</p>
+          <p className="text-lg font-bold text-blue-600">{totals.inTransit || 0}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2">
+          <p className="text-xs text-gray-500">In Use</p>
+          <p className="text-lg font-bold text-slate-600">{totals.inUse || 0}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2">
+          <p className="text-xs text-gray-500">Low Stock</p>
+          <p className="text-lg font-bold text-red-600">{totals.lowStock}</p>
         </div>
       </div>
 
@@ -614,6 +626,12 @@ const ConsumablesTab = ({ items, totals, onView }) => {
                   Reserved
                 </th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">
+                  In Transit
+                </th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">
+                  In Use
+                </th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">
                   Status
                 </th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-600">
@@ -625,7 +643,7 @@ const ConsumablesTab = ({ items, totals, onView }) => {
               {items.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={9}
                     className="px-3 py-8 text-center text-xs text-gray-500"
                   >
                     <Layers className="w-8 h-8 text-gray-300 mx-auto mb-2" />
@@ -685,6 +703,39 @@ const ConsumablesTab = ({ items, totals, onView }) => {
                         </span>
                       </td>
                       <td className="px-3 py-2 text-center">
+                        <span
+                          className={`text-xs ${
+                            item.in_transit_quantity > 0
+                              ? 'text-blue-600 font-medium'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          {item.in_transit_quantity || '-'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <span
+                            className={`text-xs ${
+                              item.in_use_quantity > 0
+                                ? 'text-slate-600 font-medium'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            {item.in_use_quantity || '-'}
+                          </span>
+                          {item.in_use_quantity > 0 && (
+                            <button
+                              onClick={() => navigate(`/dashboard/inventory/in-use/${item.id}`)}
+                              className="text-primary-600 hover:text-primary-700 transition-colors"
+                              title="View in-use locations"
+                            >
+                              <MapPin className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-center">
                         {isOutOfStock ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium bg-red-50 text-red-700 rounded">
                             Out of Stock
@@ -736,7 +787,7 @@ const PerishablesTab = ({ items, totals, onView }) => {
   return (
     <div className="space-y-2">
       {/* Stats Cards */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
         <div className="bg-white rounded-lg border border-gray-200 p-2">
           <p className="text-xs text-gray-500">Items</p>
           <p className="text-lg font-bold text-gray-900">{items.length}</p>
@@ -746,12 +797,20 @@ const PerishablesTab = ({ items, totals, onView }) => {
           <p className="text-lg font-bold text-gray-900">{totals.totalQty}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-2">
-          <p className="text-xs text-gray-500">Batches</p>
-          <p className="text-lg font-bold text-slate-600">{totals.batches}</p>
+          <p className="text-xs text-gray-500">Available</p>
+          <p className="text-lg font-bold text-green-600">{totals.available}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-2">
-          <p className="text-xs text-gray-500">Fresh</p>
-          <p className="text-lg font-bold text-green-600">{totals.fresh}</p>
+          <p className="text-xs text-gray-500">In Transit</p>
+          <p className="text-lg font-bold text-blue-600">{totals.inTransit || 0}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2">
+          <p className="text-xs text-gray-500">In Use</p>
+          <p className="text-lg font-bold text-slate-600">{totals.inUse || 0}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2">
+          <p className="text-xs text-gray-500">Batches</p>
+          <p className="text-lg font-bold text-slate-600">{totals.batches}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-2">
           <p className="text-xs text-gray-500">Near Expiry</p>
@@ -782,6 +841,12 @@ const PerishablesTab = ({ items, totals, onView }) => {
                   Available
                 </th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">
+                  In Transit
+                </th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">
+                  In Use
+                </th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">
                   Batches
                 </th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-600">
@@ -796,7 +861,7 @@ const PerishablesTab = ({ items, totals, onView }) => {
               {items.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={9}
                     className="px-3 py-8 text-center text-xs text-gray-500"
                   >
                     <Calendar className="w-8 h-8 text-gray-300 mx-auto mb-2" />
@@ -845,6 +910,39 @@ const PerishablesTab = ({ items, totals, onView }) => {
                         >
                           {item.available_quantity}
                         </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span
+                          className={`text-xs ${
+                            item.in_transit_quantity > 0
+                              ? 'text-blue-600 font-medium'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          {item.in_transit_quantity || '-'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <span
+                            className={`text-xs ${
+                              item.in_use_quantity > 0
+                                ? 'text-slate-600 font-medium'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            {item.in_use_quantity || '-'}
+                          </span>
+                          {item.in_use_quantity > 0 && (
+                            <button
+                              onClick={() => navigate(`/dashboard/inventory/in-use/${item.id}`)}
+                              className="text-primary-600 hover:text-primary-700 transition-colors"
+                              title="View in-use locations"
+                            >
+                              <MapPin className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-center">
                         <div className="flex items-center justify-center gap-1">

@@ -18,6 +18,7 @@ import CategoryForm from './pages/Categories/CategoryForm';
 import { InspectionsList, InspectionForm, InspectionDetails } from './pages/Inspections';
 import { InventoryPage, AllStoresPage, FixedAssetDistribution, ConsumableDistribution, PerishableDistribution } from './pages/Inventory';
 import NonStoreInventory from './pages/Inventory/NonStoreInventory';
+import InUseDistribution from './pages/Inventory/InUseDistribution';
 import { StockEntriesList, StockEntryForm, StockEntryDetails } from './pages/StockEntries';
 import { AcknowledgmentsList, AcknowledgmentForm } from './pages/Acknowledgments';
 import { ReturnAcknowledgmentsList, ReturnAcknowledgmentForm } from './pages/Returns';
@@ -141,6 +142,7 @@ function AppRoutes() {
         <Route path="inventory/fixed-assets/:itemId/distribution" element={<FixedAssetDistribution />} />
         <Route path="inventory/consumables/:itemId/distribution" element={<ConsumableDistribution />} />
         <Route path="inventory/perishables/:itemId/distribution" element={<PerishableDistribution />} />
+        <Route path="inventory/in-use/:locationInventoryId" element={<InUseDistribution />} />
         
         {/* QR Scanner */}
         <Route path="qr-scanner" element={<QRScanner />} />

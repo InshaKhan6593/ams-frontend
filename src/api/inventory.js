@@ -37,6 +37,12 @@ export const inventoryAPI = {
     });
     return response.data;
   },
+
+  // Get in-use distribution for an item at a store
+  getInUseDistribution: async (locationInventoryId) => {
+    const response = await apiClient.get(`/location-inventory/${locationInventoryId}/in_use_distribution/`);
+    return response.data;
+  },
 };
 
 // Fixed Assets (INDIVIDUAL tracking) API
@@ -143,5 +149,8 @@ export const perishablesAPI = {
     return response.data;
   },
 };
+
+// Alias for location inventory API
+export const locationInventoryAPI = inventoryAPI;
 
 export default inventoryAPI;
